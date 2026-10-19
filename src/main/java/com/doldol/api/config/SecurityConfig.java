@@ -24,6 +24,7 @@ public class SecurityConfig {
 			.httpBasic(b -> b.disable())
 			.formLogin(f -> f.disable())
 			.authorizeHttpRequests(auth -> auth
+					.requestMatchers("/error").permitAll()
 				.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
 				// TODO: 회원/주문 API 추가 시 JWT 인증 적용
