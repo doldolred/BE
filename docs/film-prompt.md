@@ -63,3 +63,52 @@ poster: '/film/poster.webp',
 ```
 
 `count` 는 실제로 뽑힌 파일 수와 같아야 한다.
+
+---
+
+# 제품 360° 턴테이블 — 영상 생성 프롬프트 (Gemini / Veo)
+
+상품 상세 · 홈 라인업에서 **끌어서 돌려 보는** 제품 사진 묶음. 제품 하나당 영상 하나. 파우치 사진을 참조 이미지로 같이 올린다.
+
+## 지켜야 할 것
+
+- **카메라 고정, 제품만 제자리에서 한 바퀴.** 정확히 360° 한 바퀴를 돌고 처음 자세로 돌아와야 끊김 없이 이어진다.
+- **일정한 속도.** 빨라졌다 느려지면 드래그 감각이 어긋난다.
+- **배경은 사이트 바탕색 #140a0e 단색.** 그라데이션 · 바닥 반사 없이. 그래야 무대와 경계가 안 보인다.
+- 제품이 화면 가운데, 위아래로 꽉 차지 않게(높이의 80% 정도). 조명은 고정.
+- 16:9 · 8초 · 글자 · 손 · 그림자 움직임 없음.
+
+## 프롬프트
+
+```
+Product turntable shot, single continuous take, no cuts, 16:9, 8 seconds.
+
+The product from the reference image — keep its shape, colors and printed label exactly — stands upright in the center of the frame on an invisible surface and rotates smoothly around its vertical axis, exactly one full 360-degree turn at a perfectly constant speed, ending in the same pose it started in.
+
+Camera locked, slightly above eye level, no zoom, no movement. Background: solid flat #140a0e (very dark burgundy-black), no gradient, no floor reflection, no vignette. One soft key light from the upper left and a subtle rim light, both fixed. The product fills about 80% of the frame height with empty space above and below.
+
+Premium beverage commercial look, sharp focus across the whole product, no text, no hands, no particles, no watermark.
+```
+
+참조 이미지에 붙일 한 줄:
+
+```
+Use the attached image as the exact product. Keep the label, colors and proportions unchanged from every angle.
+```
+
+## 받은 mp4 를 사이트에 넣는 법
+
+```bash
+# 한 바퀴 8초 → 1초에 9장 = 72장. 폴더 이름은 제품별로 (beet, extract, powder …)
+ffmpeg -i turntable.mp4 -t 8 -vf "fps=9,scale=1000:-2" -c:v libwebp -quality 70 FE/public/showcase/beet/t%03d.webp
+```
+
+그리고 `FE/src/data/showcase.ts` 에서 그 제품 항목의 `turntable` 을:
+
+```ts
+turntable: { base: '/showcase/beet/t', pad: 3, ext: '.webp', count: 72 },
+```
+
+`count` 는 뽑힌 파일 수와 같아야 한다. 영상이 제자리로 정확히 안 돌아오면 마지막 몇 장을 지우고 `count` 를 줄인다.
+
+제품이 늘면(농축액 · 파우더) 같은 방식으로 영상 하나씩 만들어 `showcase.ts` 에 항목을 더한다. `features` 의 `at` 은 그 특징이 켜질 각도(0 정면 · 0.5 뒷면)라 라벨 위치에 맞춰 잡는다.
