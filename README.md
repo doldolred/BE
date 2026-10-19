@@ -22,8 +22,7 @@ BE/
 ├─ docs/api.md         FE·BE 공통 API 명세
 ├─ docs/film-prompt.md 메인 영상 생성 프롬프트
 ├─ docker-compose.yml  db + backend + frontend 전체 스택
-├─ .env.example        환경변수 템플릿
-└─ BE-타이핑용-*.md    단계별 java 코드 (직접 타이핑용)
+└─ .env.example        환경변수 템플릿
 ```
 
 ## 로컬 개발
