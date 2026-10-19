@@ -1,4 +1,11 @@
 HELP.md
+.env
+*.local
+.DS_Store
+Thumbs.db
+
+# k8s 실제 시크릿
+k8s/**/secret.yaml
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
