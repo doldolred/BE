@@ -6,6 +6,10 @@ data:
   SPRING_PROFILES_ACTIVE: prod
   DB_URL: jdbc:postgresql://db:5432/doldol
   CORS_ALLOWED_ORIGINS: http://localhost
+  PAYMENT_PROVIDER: nicepay
+  FRONTEND_URL: ""
+  PAYMENT_PENDING_TIMEOUT: PT30M
+  NICEPAY_API_URL: https://sandbox-api.nicepay.co.kr
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -36,6 +40,19 @@ spec:
               valueFrom: { secretKeyRef: { name: doldol-secrets, key: DB_PASSWORD } }
             - name: JWT_SECRET
               valueFrom: { secretKeyRef: { name: doldol-secrets, key: JWT_SECRET } }
+            # 결제 키 — 비어 있어도 서버는 뜬다 (optional)
+            - name: NICEPAY_CLIENT_ID
+              valueFrom: { secretKeyRef: { name: doldol-secrets, key: NICEPAY_CLIENT_ID, optional: true } }
+            - name: NICEPAY_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: doldol-secrets, key: NICEPAY_SECRET_KEY, optional: true } }
+            - name: PORTONE_STORE_ID
+              valueFrom: { secretKeyRef: { name: doldol-secrets, key: PORTONE_STORE_ID, optional: true } }
+            - name: PORTONE_CHANNEL_KEY
+              valueFrom: { secretKeyRef: { name: doldol-secrets, key: PORTONE_CHANNEL_KEY, optional: true } }
+            - name: PORTONE_API_SECRET
+              valueFrom: { secretKeyRef: { name: doldol-secrets, key: PORTONE_API_SECRET, optional: true } }
+            - name: PORTONE_WEBHOOK_SECRET
+              valueFrom: { secretKeyRef: { name: doldol-secrets, key: PORTONE_WEBHOOK_SECRET, optional: true } }
           startupProbe:
             httpGet: { path: /actuator/health/liveness, port: 8080 }
             periodSeconds: 5

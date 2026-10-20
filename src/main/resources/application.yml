@@ -40,6 +40,24 @@ app:
     # HS256 서명용, 32바이트 이상. 운영에서는 반드시 JWT_SECRET 환경변수로 교체
     secret: ${JWT_SECRET:local-dev-secret-key-change-me-0123456789abcdef}
     access-token-validity: ${JWT_ACCESS_VALIDITY:PT2H}
+  payment:
+    # nicepay: 나이스페이 START 직접 연동 / portone: 포트원 경유(정산 때 나이스페이먼츠로 갈아탈 때)
+    provider: ${PAYMENT_PROVIDER:nicepay}
+    # 결제 후 돌려보낼 FE 주소. 비우면 같은 도메인 기준 상대 경로(/mypage/orders/...)로 보낸다
+    frontend-url: ${FRONTEND_URL:}
+    # 결제하지 않은 주문을 자동 취소하고 재고를 돌려놓기까지의 시간
+    pending-timeout: ${PAYMENT_PENDING_TIMEOUT:PT30M}
+    nicepay:
+      client-id: ${NICEPAY_CLIENT_ID:}
+      secret-key: ${NICEPAY_SECRET_KEY:}
+      # 운영: https://api.nicepay.co.kr
+      api-url: ${NICEPAY_API_URL:https://sandbox-api.nicepay.co.kr}
+    portone:
+      store-id: ${PORTONE_STORE_ID:}
+      channel-key: ${PORTONE_CHANNEL_KEY:}
+      api-secret: ${PORTONE_API_SECRET:}
+      webhook-secret: ${PORTONE_WEBHOOK_SECRET:}
+      api-url: ${PORTONE_API_URL:https://api.portone.io}
 
 ---
 spring:
