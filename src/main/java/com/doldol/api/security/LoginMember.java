@@ -1,4 +1,7 @@
 package com.doldol.api.security;
 
-public class LoginMember {
+import com.doldol.api.member.Role;
+
+public record LoginMember(Long id, String email, Role role) {
+
 }

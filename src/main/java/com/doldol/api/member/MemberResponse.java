@@ -1,4 +1,10 @@
 package com.doldol.api.member;
 
-public class MemberResponse {
+public record MemberResponse(Long id, String email, String name, String phone, Role role) {
+
+    public static MemberResponse from(Member member) {
+        return new MemberResponse(member.getId(), member.getEmail(), member.getName(), member.getPhone(),
+                member.getRole());
+    }
+
 }

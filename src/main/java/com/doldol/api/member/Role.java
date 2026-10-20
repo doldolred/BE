@@ -1,4 +1,5 @@
 package com.doldol.api.member;
 
-public class Role {
+public enum Role {
+    USER, ADMIN
 }
