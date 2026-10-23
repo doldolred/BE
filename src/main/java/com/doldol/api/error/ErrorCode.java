@@ -29,6 +29,16 @@ public enum ErrorCode {
     OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
     CART_EMPTY(HttpStatus.CONFLICT, "장바구니가 비어 있습니다."),
     ORDER_NOT_CANCELLABLE(HttpStatus.CONFLICT, "취소할 수 없는 주문입니다."),
+    INVALID_STATUS_TRANSITION(HttpStatus.CONFLICT, "바꿀 수 없는 주문 상태입니다."),
+    CANNOT_CHANGE_OWN_ROLE(HttpStatus.CONFLICT, "자기 자신의 권한은 바꿀 수 없습니다."),
+    ORDER_NOT_PAYABLE(HttpStatus.CONFLICT, "결제할 수 없는 주문입니다."),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "결제 금액이 주문 금액과 다릅니다."),
+    PAYMENT_NOT_COMPLETED(HttpStatus.CONFLICT, "결제가 완료되지 않았습니다."),
+
+    // 400 (관리자)
+    INVALID_PERIOD(HttpStatus.BAD_REQUEST, "조회 기간을 확인해 주세요. (최대 1년)"),
+    // 502
+    PAYMENT_GATEWAY_ERROR(HttpStatus.BAD_GATEWAY, "결제사 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
 
     // 500
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");

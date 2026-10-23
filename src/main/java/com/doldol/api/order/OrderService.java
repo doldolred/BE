@@ -6,6 +6,7 @@ import com.doldol.api.error.BusinessException;
 import com.doldol.api.error.ErrorCode;
 import com.doldol.api.member.Member;
 import com.doldol.api.member.MemberRepository;
+import com.doldol.api.payment.PaymentService;
 import com.doldol.api.product.Product;
 import com.doldol.api.product.ProductRepository;
 import java.time.Instant;
@@ -27,6 +28,7 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
+    private final PaymentService paymentService;
 
     @Transactional
     public OrderDetailResponse createOrder(Long memberId, CreateOrderRequest request) {
@@ -56,6 +58,7 @@ public class OrderService {
     public OrderDetailResponse cancelOrder(Long memberId, String orderNumber) {
         Order order = findMine(memberId, orderNumber);
         order.cancel();
+        paymentService.refund(order, "고객 요청 취소"); // 결제된 주문이면 환불 — 실패하면 취소도 롤백
         for (OrderItem item : order.getItems()) {productRepository.increaseStock(item.getProduct().getId(), item.getQuantity());
         }return OrderDetailResponse.from(order);
     }

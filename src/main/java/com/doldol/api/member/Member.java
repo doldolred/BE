@@ -40,4 +40,6 @@ public class Member extends BaseEntity{
         member.role = Role.USER;
         return member;
     }
+//관리자 권한 변경
+    public void changeRole(Role role){this.role = role;}
 }

@@ -50,6 +50,8 @@ public class SecurityConfig {
 						.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+						// 나이스페이 결제 결과 (브라우저 form POST) — 로그인 대신 서명으로 검증한다
+						.requestMatchers(HttpMethod.POST, "/api/payments/nicepay/return").permitAll()
 						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.anyRequest().authenticated());
 		return http.build();

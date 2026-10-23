@@ -15,6 +15,8 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+        # 목록에서 연관 데이터(주문 상품 · 회원)를 한 건씩이 아니라 최대 100건씩 묶어서 조회 (N+1 방지)
+        default_batch_fetch_size: 100
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -47,6 +49,8 @@ app:
     frontend-url: ${FRONTEND_URL:}
     # 결제하지 않은 주문을 자동 취소하고 재고를 돌려놓기까지의 시간
     pending-timeout: ${PAYMENT_PENDING_TIMEOUT:PT30M}
+    # 자동 취소 대상을 확인하는 주기
+    expire-check-interval: ${PAYMENT_EXPIRE_CHECK_INTERVAL:PT1M}
     nicepay:
       client-id: ${NICEPAY_CLIENT_ID:}
       secret-key: ${NICEPAY_SECRET_KEY:}
@@ -72,6 +76,9 @@ spring:
   config:
     activate:
       on-profile: prod
+server:
+  # edge(nginx) 뒤에서 돈다 — X-Forwarded-For · Proto 로 실제 접속 IP 와 https 를 인식
+  forward-headers-strategy: native
 logging:
   level:
     root: INFO

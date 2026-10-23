@@ -200,12 +200,16 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 ```json
 "payment": {
   "provider": "NICEPAY",
+  "status": "PAID",
   "method": "card",
   "amount": 78000,
   "approvedAt": "2026-10-19T02:45:10Z",
+  "cancelledAt": null,
   "receiptUrl": "https://..."
 }
 ```
+
+`status` 는 `PAID` · `CANCELLED`(주문 취소로 환불됨 — `cancelledAt` 채워짐). 승인 거절된 시도는 여기 안 보이고 DB 에만 `FAILED` 로 남습니다.
 
 ### `POST /api/orders/{orderNumber}/cancel` 주문 취소
 
@@ -231,6 +235,8 @@ PG 는 설정 한 줄로 고릅니다 (`PAYMENT_PROVIDER`, BE · FE 같은 값).
 - **금액은 서버가 검증합니다.** PG 가 알려준 금액 ≠ 주문 `totalPrice` 면 승인하지 않습니다(위변조 방지).
 - 승인되면 주문은 `PAID`, `payment` 테이블에 기록(`provider`, `payment_key`, `method`, `amount`, `approved_at`).
 - 결제하지 않은 주문은 `PAYMENT_PENDING_TIMEOUT`(기본 30분) 뒤 자동 취소되고 재고가 돌아옵니다.
+  (`PAYMENT_EXPIRE_CHECK_INTERVAL`, 기본 1분마다 확인. 승인 직전에 자동 취소된 주문이면 승인된 결제를 바로 취소합니다)
+- 고객 · 관리자가 결제된 주문을 취소하면 **결제한 PG 로** 환불합니다(설정을 바꿔도 예전 결제는 원래 PG 로). 환불이 실패하면 주문도 취소되지 않습니다(`502 PAYMENT_GATEWAY_ERROR`).
 - 결제창을 닫거나 실패해도 주문은 `PENDING_PAYMENT` 로 남아 있어서, 주문 상세에서 다시 결제할 수 있습니다.
 
 ### A. 나이스페이 START (`nicepay`)
@@ -265,7 +271,9 @@ BE 가 할 일:
 
 결제 취소(환불): `POST {NICEPAY_API_URL}/v1/payments/{tid}/cancel` (같은 Basic 인증). 세부 필드는 [나이스페이 매뉴얼](https://github.com/nicepayments/nicepay-manual)의 `api/cancel.md` 기준.
 
-### B. 포트원 V2 (`portone`)
+### B. 포트원 V2 (`portone`) — ⏸ 나중에 (정산 때 나이스페이먼츠로 갈아탈 때)
+
+> 지금 BE 는 **나이스페이 START 만** 구현돼 있습니다(2026-10-23 결정). 아래 포트원 API 는 갈아탈 때 만들 설계입니다. FE 는 `VITE_PAYMENT_PROVIDER=nicepay` 로 둡니다.
 
 1. FE: `@portone/browser-sdk/v2` 로 결제창
    ```js
@@ -312,7 +320,127 @@ BE 가 할 일:
 
 ---
 
+## 🔒 관리자 (`/api/admin/**`, `role: ADMIN` 만)
+
+관리자 만들기 — 가입 후 DB 에서: `UPDATE member SET role = 'ADMIN' WHERE email = '...';` (그 뒤로는 관리자가 회원관리에서 바꿀 수 있음)
+
+공통:
+- 날짜(`from` · `to`)는 `YYYY-MM-DD`, **한국 시간 기준**, `to` 는 그날 끝까지 포함
+- 페이지 응답 `PageResponse`: `{ "content": [...], "page": 0, "size": 20, "totalElements": 42, "totalPages": 3 }` (`page` 는 0 부터, `size` 최대 100)
+- 일반 회원 토큰 → `403 FORBIDDEN`, 토큰 없음 → `401 UNAUTHORIZED`
+
+### 매출관리
+
+#### `GET /api/admin/sales/summary?from=2026-10-01&to=2026-10-31`
+
+비우면 오늘까지 최근 30일. 최대 1년(넘거나 from > to 면 `400 INVALID_PERIOD`).
+
+```json
+{
+  "from": "2026-10-01", "to": "2026-10-31",
+  "totalSales": 780000,          // 결제완료 · 준비중 · 배송중 · 배송완료 주문의 금액 합
+  "orderCount": 20,
+  "averageOrderValue": 39000,
+  "cancelledCount": 2, "cancelledAmount": 78000,
+  "pendingCount": 3,             // 아직 결제 대기
+  "daily": [ { "date": "2026-10-01", "sales": 39000, "orders": 1 }, ... ],   // 주문 없는 날도 0 으로
+  "topProducts": [ { "productId": 1, "productName": "돌돌 비트즙 30포", "quantity": 22, "sales": 858000 } ]  // 금액순 5개
+}
+```
+
+### 주문관리
+
+#### `GET /api/admin/orders?status=&from=&to=&keyword=&page=0&size=20`
+
+모든 조건은 선택. `keyword` 는 주문번호 · 받는 분 · 회원 이메일 · 회원 이름에서 찾음(대소문자 무시). 최신순.
+
+`200 OK` — `PageResponse` of
+```json
+{ "orderNumber": "20261022-318151", "status": "PAID", "totalPrice": 78000, "itemSummary": "돌돌 비트즙 30포",
+  "memberEmail": "a@doldol.com", "memberName": "홍길동", "receiverName": "홍길동", "createdAt": "2026-10-22T05:50:40Z" }
+```
+
+#### `GET /api/admin/orders/{orderNumber}`
+
+```json
+{
+  "order": { /* 고객용 OrderDetailResponse 와 같음 */ },
+  "memberId": 6, "memberEmail": "a@doldol.com", "memberName": "홍길동",
+  "courier": "CJ대한통운", "trackingNumber": "123456789012",
+  "shippedAt": "2026-10-23T01:00:00Z", "deliveredAt": null
+}
+```
+
+#### `PATCH /api/admin/orders/{orderNumber}/status`
+
+```json
+{ "status": "SHIPPING", "courier": "CJ대한통운", "trackingNumber": "123456789012" }
+```
+
+| 지금 → 바꿀 수 있는 상태 | |
+| --- | --- |
+| `PENDING_PAYMENT` → `PAID`(결제 확인) · `CANCELLED` | |
+| `PAID` → `PREPARING` · `CANCELLED` | |
+| `PREPARING` → `SHIPPING`(택배사 · 송장번호 **필수**) · `CANCELLED` | |
+| `SHIPPING` → `DELIVERED` | |
+| `DELIVERED` · `CANCELLED` → 변경 불가 | |
+
+- 규칙에 없는 변경 → `409 INVALID_STATUS_TRANSITION`, 송장 없이 `SHIPPING` → `400 INVALID_INPUT`
+- `CANCELLED` 로 바꾸면 재고가 돌아온다. (결제 연동 후에는 PG 환불도 함께 — TODO)
+
+`200 OK` — 위 주문 상세
+
+### 제품관리
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/products` | 판매 중지 포함 전체, 최근 등록순 |
+| `GET /api/admin/products/{id}` | 상세 |
+| `POST /api/admin/products` | 등록 → `201` |
+| `PUT /api/admin/products/{id}` | 수정 (전체 값) |
+| `PATCH /api/admin/products/{id}/active` `{ "active": false }` | 판매 중지 / 재개 |
+
+```json
+// 등록 · 수정 요청
+{ "name": "돌돌 비트 농축액", "description": "...", "price": 29000, "stock": 50, "imageUrl": "https://...", "active": true }
+// 응답
+{ "id": 2, "name": "...", "description": "...", "price": 29000, "stock": 50, "imageUrl": "https://...",
+  "active": true, "createdAt": "...", "updatedAt": "..." }
+```
+
+상품은 지우지 않는다 — 지난 주문이 참조하고 있어서 **판매 중지**로 숨긴다. 판매 중지 상품은 고객 목록 · 상세에서 안 보인다(404). 가격을 바꿔도 지난 주문의 금액은 그대로.
+
+### 회원관리
+
+#### `GET /api/admin/members?keyword=&page=0&size=20`
+
+`keyword` 는 이메일 · 이름(대소문자 무시). 최근 가입순. `PageResponse` of
+```json
+{ "id": 6, "email": "a@doldol.com", "name": "홍길동", "phone": null, "role": "USER", "createdAt": "...",
+  "orderCount": 2, "totalSpent": 78000 }   // totalSpent: 매출로 잡는 주문만
+```
+
+#### `GET /api/admin/members/{id}`
+
+```json
+{ "member": { /* 위 한 줄과 같음 */ }, "recentOrders": [ /* OrderSummaryResponse, 최근 5건 */ ] }
+```
+
+#### `PATCH /api/admin/members/{id}/role` `{ "role": "ADMIN" }`
+
+자기 자신의 권한은 못 바꾼다 → `409 CANNOT_CHANGE_OWN_ROLE`
+
+### 관리자 에러 코드 (추가)
+
+| HTTP | code | 상황 |
+| --- | --- | --- |
+| 409 | `INVALID_STATUS_TRANSITION` | 규칙에 없는 주문 상태 변경 |
+| 409 | `CANNOT_CHANGE_OWN_ROLE` | 본인 권한 변경 시도 |
+| 400 | `INVALID_PERIOD` | 조회 기간이 거꾸로이거나 1년 초과 |
+
+---
+
 ## 나중에 추가
 
-- 관리자 상품/주문 관리 — `/api/admin/**` (`role: ADMIN`)
+- 관리자 화면(FE), 상품 이미지 업로드, 엑셀 내보내기
 - 리프레시 토큰, 배송비 정책
