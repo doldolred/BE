@@ -57,37 +57,13 @@ docker compose up -d --build
 
 ## AWS Lightsail 배포
 
-인스턴스 1대 기준. 추천: Ubuntu 24.04, **2GB RAM 이상** (JVM + Postgres + nginx).
+운영은 **[deploy/README.md](deploy/README.md)** — 1대에 nginx(HTTPS) · API · 웹 · Postgres · 자동 백업을 docker compose 로.
+이미지는 GitHub Actions 가 만들어 GHCR 에 올리고, 서버는 `deploy/deploy.sh` 로 받아서 띄운다.
 
-### A. Docker Compose (초기 추천)
-
-```bash
-# 인스턴스에서
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2 git
-sudo usermod -aG docker $USER   # 재접속
-mkdir doldol && cd doldol
-git clone https://github.com/doldolred/BE.git && git clone https://github.com/doldolred/FE.git
-cd BE && cp .env.example .env && vi .env
-docker compose up -d --build
-```
-
-- Lightsail 네트워킹 탭에서 HTTP(80)/HTTPS(443) 열기, 5432 는 열지 않기
-- 고정 IP(Static IP) 붙이기 → 도메인 확정 시 A 레코드 연결
-- 운영에서는 `.env` 의 `DB_PORT` 바인딩을 제거하거나 `127.0.0.1:5432:5432` 로 제한 권장
-
-### B. Kubernetes (k3s)
-
-Lightsail 단일 인스턴스에 k3s 를 올려 같은 매니페스트를 사용.
-
-```bash
-curl -sfL https://get.k3s.io | sh -
-cp k8s/secret.example.yaml k8s/secret.yaml   # 값 수정 후 kustomization.yaml 에서 주석 해제
-# 이미지 레지스트리(ECR / GHCR 등) push 후 k8s/kustomization.yaml 의 images 수정
-sudo k3s kubectl apply -k k8s
-```
+k8s(`k8s/`, k3s 용 매니페스트)는 규모가 커졌을 때를 위해 남겨 둔다.
 
 ## 도메인 확정 후 할 일
 
 - [ ] Lightsail DNS 또는 외부 DNS 에 A 레코드 → 고정 IP
-- [ ] HTTPS (Compose: certbot / Caddy, k3s: cert-manager)
+- [ ] HTTPS — `deploy/init-letsencrypt.sh` (k3s 로 갈 때는 cert-manager)
 - [ ] `CORS_ALLOWED_ORIGINS`, `k8s/ingress.yaml` host 갱신

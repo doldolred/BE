@@ -42,3 +42,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# 운영 서버에서 생기는 것 (인증서 · DB 백업)
+deploy/certbot/
+deploy/backups/

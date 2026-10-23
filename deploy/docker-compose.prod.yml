@@ -1,0 +1,146 @@
+# 운영(Lightsail 1대) — 사용법은 deploy/README.md
+#
+#   인터넷 ─▶ edge(nginx, 80/443, HTTPS) ─┬─▶ frontend(nginx, 정적 파일)
+#                                          └─▶ backend(Spring, /api) ─▶ db(Postgres)
+#   certbot : 인증서 자동 갱신 · backup : 매일 DB 덤프 (+ 선택: Lightsail 버킷 업로드)
+#
+# 밖으로 열리는 포트는 edge 의 80 · 443 뿐이다. DB · API 는 도커 내부망에서만 보인다.
+# 값은 같은 폴더의 .env (cp .env.prod.example .env)
+
+# 개발용 docker-compose.yml(name: doldol)과 볼륨 · 네트워크가 섞이지 않게 이름을 따로 둔다
+name: doldol-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-doldol}
+      POSTGRES_USER: ${DB_USERNAME:-doldol}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}
+      TZ: Asia/Seoul
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    logging: *logging
+
+  backend:
+    # CI(GitHub Actions)가 올린 이미지를 받아 쓴다. 서버에서 직접 빌드하려면: docker compose build backend
+    image: ${BACKEND_IMAGE:-ghcr.io/doldolred/be:latest}
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Seoul
+      # 힙은 컨테이너 메모리(mem_limit)의 75% — Dockerfile 의 MaxRAMPercentage
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-doldol}
+      DB_USERNAME: ${DB_USERNAME:-doldol}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 를 .env 에 설정하세요 (32자 이상)}
+      CORS_ALLOWED_ORIGINS: https://${DOMAIN:?DOMAIN 을 .env 에 설정하세요}
+      FRONTEND_URL: https://${DOMAIN}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-nicepay}
+      PAYMENT_PENDING_TIMEOUT: ${PAYMENT_PENDING_TIMEOUT:-PT30M}
+      NICEPAY_CLIENT_ID: ${NICEPAY_CLIENT_ID:-}
+      NICEPAY_SECRET_KEY: ${NICEPAY_SECRET_KEY:-}
+      NICEPAY_API_URL: ${NICEPAY_API_URL:-https://sandbox-api.nicepay.co.kr}
+      PORTONE_STORE_ID: ${PORTONE_STORE_ID:-}
+      PORTONE_CHANNEL_KEY: ${PORTONE_CHANNEL_KEY:-}
+      PORTONE_API_SECRET: ${PORTONE_API_SECRET:-}
+      PORTONE_WEBHOOK_SECRET: ${PORTONE_WEBHOOK_SECRET:-}
+    expose:
+      - "8080"
+    mem_limit: 768m
+    logging: *logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/doldolred/fe:latest}
+    build:
+      # FE 저장소를 BE 옆에 clone 해 둔 경우에만 (서버에서 직접 빌드할 때)
+      context: ../../FE
+      args:
+        VITE_PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-nicepay}
+        VITE_NICEPAY_CLIENT_ID: ${NICEPAY_CLIENT_ID:-}
+        VITE_PORTONE_STORE_ID: ${PORTONE_STORE_ID:-}
+        VITE_PORTONE_CHANNEL_KEY: ${PORTONE_CHANNEL_KEY:-}
+    restart: unless-stopped
+    expose:
+      - "80"
+    mem_limit: 64m
+    logging: *logging
+
+  edge:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      # 비우면 nginx 설정이 깨지지 않게 아무도 쓰지 않는 이름을 넣는다
+      DOMAIN_ALIASES: ${DOMAIN_ALIASES:-no-alias.invalid}
+    volumes:
+      # templates/*.template 의 ${DOMAIN} 을 채워서 conf.d 에 둔다 (nginx 공식 이미지 기능)
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    # 갱신된 인증서를 읽도록 6시간마다 reload
+    command: ["/bin/sh", "-c", "while :; do sleep 6h; nginx -s reload; done & exec /docker-entrypoint.sh nginx -g 'daemon off;'"]
+    mem_limit: 64m
+    logging: *logging
+
+  certbot:
+    image: certbot/certbot:v2.11.0
+    restart: unless-stopped
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    # 12시간마다 갱신 시도 (만료 30일 전부터 실제 갱신). 첫 발급은 init-letsencrypt.sh
+    entrypoint: ["/bin/sh", "-c", "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"]
+    mem_limit: 128m
+    logging: *logging
+
+  backup:
+    build: ./backup
+    image: doldol-backup:local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGDATABASE: ${DB_NAME:-doldol}
+      PGUSER: ${DB_USERNAME:-doldol}
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_AT_KST_HOUR: ${BACKUP_AT_KST_HOUR:-4}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      # 비우면 서버 디스크(./backups)에만. Lightsail 버킷에도 올리려면 s3://버킷이름/db 와 키
+      BACKUP_S3_URI: ${BACKUP_S3_URI:-}
+      AWS_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      AWS_DEFAULT_REGION: ${BACKUP_S3_REGION:-ap-northeast-2}
+    volumes:
+      - ./backups:/backups
+    mem_limit: 128m
+    logging: *logging
+
+volumes:
+  db-data:
