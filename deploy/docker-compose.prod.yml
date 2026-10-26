@@ -54,6 +54,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 를 .env 에 설정하세요 (32자 이상)}
       CORS_ALLOWED_ORIGINS: https://${DOMAIN:?DOMAIN 을 .env 에 설정하세요}
       FRONTEND_URL: https://${DOMAIN}
+      # 로그인 유지 쿠키는 https 에서만
+      AUTH_COOKIE_SECURE: "true"
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-nicepay}
       PAYMENT_PENDING_TIMEOUT: ${PAYMENT_PENDING_TIMEOUT:-PT30M}
       NICEPAY_CLIENT_ID: ${NICEPAY_CLIENT_ID:-}
@@ -63,6 +65,20 @@ services:
       PORTONE_CHANNEL_KEY: ${PORTONE_CHANNEL_KEY:-}
       PORTONE_API_SECRET: ${PORTONE_API_SECRET:-}
       PORTONE_WEBHOOK_SECRET: ${PORTONE_WEBHOOK_SECRET:-}
+      # 메일 (비밀번호 찾기) — 비우면 보내지 않고 로그에만
+      SPRING_MAIL_HOST: ${MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-DOLDOL <no-reply@doldol.co.kr>}
+      # 서버를 켤 때 관리자로 바꿀 회원 이메일 (쉼표로 여러 개, 먼저 가입해 둘 것)
+      INITIAL_ADMIN_EMAILS: ${INITIAL_ADMIN_EMAILS:-}
+      UPLOAD_DIR: /app/uploads
+      SHIPPING_BASE_FEE: ${SHIPPING_BASE_FEE:-3000}
+      SHIPPING_FREE_THRESHOLD: ${SHIPPING_FREE_THRESHOLD:-50000}
+    volumes:
+      # 관리자가 올린 상품 이미지 — 컨테이너를 새로 띄워도 남는다 (매일 백업에도 포함)
+      - uploads:/app/uploads
     expose:
       - "8080"
     mem_limit: 768m
@@ -139,8 +155,10 @@ services:
       AWS_DEFAULT_REGION: ${BACKUP_S3_REGION:-ap-northeast-2}
     volumes:
       - ./backups:/backups
+      - uploads:/uploads:ro
     mem_limit: 128m
     logging: *logging
 
 volumes:
   db-data:
+  uploads:

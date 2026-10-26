@@ -10,7 +10,7 @@ RUN ./gradlew --no-daemon bootJar -x test
 # ---- run ----
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN useradd --system --uid 1001 spring
+RUN useradd --system --uid 1001 spring && mkdir -p /app/uploads && chown spring /app/uploads
 COPY --from=build /workspace/build/libs/*.jar app.jar
 USER spring
 EXPOSE 8080

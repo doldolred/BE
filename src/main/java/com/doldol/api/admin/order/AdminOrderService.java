@@ -7,7 +7,7 @@ import com.doldol.api.order.Order;
 import com.doldol.api.order.OrderItem;
 import com.doldol.api.order.OrderStatus;
 import com.doldol.api.payment.PaymentService;
-import com.doldol.api.product.ProductRepository;
+import com.doldol.api.product.ProductOptionRepository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumSet;
@@ -26,7 +26,7 @@ public class AdminOrderService {
     private static final Instant MIN_TIME = Instant.EPOCH;
     private static final Instant MAX_TIME = Instant.parse("9999-12-31T00:00:00Z");
     private final AdminOrderRepository adminOrderRepository;
-    private final ProductRepository productRepository;
+    private final ProductOptionRepository productOptionRepository;
     private final PaymentService paymentService;
     public PageResponse<AdminOrderSummaryResponse> search(OrderStatus status, LocalDate from, LocalDate to, String keyword, int page, int size){
         Set<OrderStatus>statuses = status == null ? EnumSet.allOf(OrderStatus.class) : EnumSet.of(status);
@@ -48,7 +48,7 @@ public class AdminOrderService {
         if (request.status() == OrderStatus.CANCELLED) {
             paymentService.refund(order, "관리자 취소"); // 결제된 주문이면 환불 — 실패하면 상태 변경도 롤백
             for (OrderItem item : order.getItems()) {
-                productRepository.increaseStock(item.getProduct().getId(), item.getQuantity());
+                productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
             }
         }
         return AdminOrderDetailResponse.from(order);

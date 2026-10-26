@@ -9,7 +9,7 @@ public record AdminOrderSummaryResponse(String orderNumber, OrderStatus status, 
     public static AdminOrderSummaryResponse from(Order o) {
         var items = o.getItems();
         String summary = items.isEmpty() ? ""
-                : items.get(0).getProductName() + (items.size() > 1 ? " 외 " + (items.size() - 1) + "건" : "");
+                : items.get(0).getDisplayName() + (items.size() > 1 ? " 외 " + (items.size() - 1) + "건" : "");
         return new AdminOrderSummaryResponse(o.getOrderNumber(), o.getStatus(), o.getTotalPrice(), summary,
                 o.getMember().getEmail(), o.getMember().getName(), o.getReceiverName(), o.getCreatedAt());
     }

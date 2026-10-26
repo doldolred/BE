@@ -14,7 +14,7 @@ certbot : 인증서 자동 갱신        backup : 매일 DB 덤프 (+ Lightsail 
 | `setup-server.sh` | 새 서버 첫 셋팅 (스왑 2GB · 시간대 · Docker) |
 | `init-letsencrypt.sh` | 첫 HTTPS 인증서 발급 (이후 갱신은 자동) |
 | `deploy.sh` | 새 버전 배포 (이미지 받기 → 다시 띄우기 → API 확인) |
-| `backup/` · `restore.sh` | 매일 DB 백업 · 복원 |
+| `backup/` · `restore.sh` | 매일 DB · 상품 이미지 백업, DB 복원 (이미지는 `tar -xzf … -C` 로 볼륨에 풀기) |
 | `../.github/workflows/docker-image.yml` | main push → 테스트 → API 이미지를 GHCR 에 (FE 저장소에도 같은 이름으로 있음) |
 
 ## 1. Lightsail 준비 (콘솔)
@@ -65,7 +65,7 @@ bash deploy.sh               # 이미지 받기 → 전부 띄우기 → https:/
 | 상태 | `docker compose -f docker-compose.prod.yml ps` |
 | 로그 | `docker compose -f docker-compose.prod.yml logs -f --tail=100 backend` |
 | 지금 바로 DB 백업 | `docker compose -f docker-compose.prod.yml exec backup backup.sh` |
-| 백업 목록 | `ls -lh backups/` (매일 04시, 14일 보관) |
+| 백업 목록 | `ls -lh backups/` (매일 04시, 14일 보관 — DB 덤프 + 상품 이미지 tar) |
 | 복원 | `bash restore.sh backups/doldol-YYYYMMDD-HHMMSS.dump` (복원 직전 상태를 먼저 백업함) |
 | 메모리 사용량 | `docker stats --no-stream` |
 
@@ -78,8 +78,11 @@ bash deploy.sh               # 이미지 받기 → 전부 띄우기 → https:/
 - [ ] 실제 카드로 소액 결제 → 주문 상세 확인 → 취소(환불)까지 한 번
 - [ ] HTTPS 가 며칠 문제없으면 `nginx/templates/default.conf.template` 의 `Strict-Transport-Security` 주석 해제 → `bash deploy.sh`
 - [ ] 백업 복원 연습 한 번 (다른 날짜 덤프로 `restore.sh`)
-- [ ] 관리자 계정: 가입 후 DB 에서 한 번만 `update member set role='ADMIN' where email='...'`
-  (`docker compose -f docker-compose.prod.yml exec db psql -U doldol -d doldol`)
+- [ ] 관리자 계정: 사이트에서 가입 → `.env` 의 `INITIAL_ADMIN_EMAILS` 에 그 이메일 → `bash deploy.sh` (켤 때 관리자로 바뀜, 로그에 "관리자로 지정").
+  그다음 관리자는 화면(관리자 → 회원)에서 지정할 수 있다
+- [ ] 메일(비밀번호 찾기): AWS SES 에서 보내는 도메인 인증 → SMTP 자격 증명 → `.env` 의 `MAIL_*`.
+  비워 두면 메일 대신 `docker compose -f docker-compose.prod.yml logs backend` 에 링크가 찍힌다
+- [ ] 배송 지역: 관리자 → 배송 지역에서 CJ대한통운 도서산간 우편번호 구간을 넣기 (처음엔 제주 · 울릉도만)
 
 ## 나중에 바꿀 때
 

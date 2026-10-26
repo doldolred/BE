@@ -1,7 +1,7 @@
 package com.doldol.api.cart;
 import com.doldol.api.common.BaseEntity;
 import com.doldol.api.member.Member;
-import com.doldol.api.product.Product;
+import com.doldol.api.product.ProductOption;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -26,15 +26,16 @@ public class CartItem extends BaseEntity{
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
+    /** 담은 옵션 (예: 30포). 상품은 option.getProduct() */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @JoinColumn(name = "option_id", nullable = false)
+    private ProductOption option;
     @Column(nullable = false)
     private int quantity;
-    public static CartItem create(Member member, Product product, int quantity){
+    public static CartItem create(Member member, ProductOption option, int quantity){
         CartItem item = new CartItem();
         item.member = member;
-        item.product = product;
+        item.option = option;
         item.quantity = quantity;
         return item;
     }
@@ -45,6 +46,6 @@ public class CartItem extends BaseEntity{
         this.quantity = quantity;
     }
     public int getLineTotal(){
-        return product.getPrice() * quantity;
+        return option.getPrice() * quantity;
     }
 }

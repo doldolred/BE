@@ -6,7 +6,7 @@ import com.doldol.api.order.Order;
 import com.doldol.api.order.OrderItem;
 import com.doldol.api.order.OrderRepository;
 import com.doldol.api.order.OrderStatus;
-import com.doldol.api.product.ProductRepository;
+import com.doldol.api.product.ProductOptionRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -34,7 +34,7 @@ public class PaymentService {
 
 	private final PaymentRepository paymentRepository;
 
-	private final ProductRepository productRepository;
+	private final ProductOptionRepository productOptionRepository;
 
 	private final NicepayClient nicepayClient;
 
@@ -177,7 +177,7 @@ public class PaymentService {
 		}
 		order.cancel();
 		for (OrderItem item : order.getItems()) {
-			productRepository.increaseStock(item.getProduct().getId(), item.getQuantity());
+			productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
 		}
 	}
 

@@ -11,9 +11,18 @@ pg_dump -Fc --no-owner -f "$file.tmp"
 mv "$file.tmp" "$file"
 echo "[backup] $(date -u +%FT%TZ) 저장 $file ($(du -h "$file" | cut -f1))"
 
-find /backups -name 'doldol-*.dump' -mtime +"$keep" -print -delete
+# 상품 이미지 (있을 때만)
+uploads=""
+if [ -d /uploads ] && [ -n "$(ls -A /uploads 2>/dev/null)" ]; then
+  uploads="/backups/${name%.dump}-uploads.tar.gz"
+  tar -czf "$uploads.tmp" -C /uploads . && mv "$uploads.tmp" "$uploads"
+  echo "[backup] 이미지 $uploads ($(du -h "$uploads" | cut -f1))"
+fi
+
+find /backups -name 'doldol-*' -mtime +"$keep" -print -delete
 
 if [ -n "${BACKUP_S3_URI:-}" ]; then
   aws s3 cp --only-show-errors "$file" "${BACKUP_S3_URI%/}/$name"
+  [ -n "$uploads" ] && aws s3 cp --only-show-errors "$uploads" "${BACKUP_S3_URI%/}/$(basename "$uploads")"
   echo "[backup] 업로드 ${BACKUP_S3_URI%/}/$name"
 fi

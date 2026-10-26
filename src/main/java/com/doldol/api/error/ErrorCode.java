@@ -11,10 +11,14 @@ public enum ErrorCode {
 
     // 400
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "입력값을 확인해 주세요."),
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "현재 비밀번호가 맞지 않습니다."),
+    INVALID_RESET_TOKEN(HttpStatus.BAD_REQUEST, "링크가 만료됐거나 이미 사용됐어요. 비밀번호 찾기를 다시 해 주세요."),
+    INVALID_FILE(HttpStatus.BAD_REQUEST, "이미지 파일(jpg · png · webp · gif, 5MB 이하)만 올릴 수 있어요."),
 
     // 401, 403
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "로그인이 만료됐어요. 다시 로그인해 주세요."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
 
     // 404

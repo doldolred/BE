@@ -50,8 +50,17 @@ public class Order extends BaseEntity {
     @Column(nullable = false, length = 20)
     private OrderStatus status;
 
+    /** 결제 금액 = itemsPrice + shippingFee */
     @Column(nullable = false)
     private int totalPrice;
+
+    /** 상품 금액 합계 (V5) */
+    @Column(nullable = false)
+    private int itemsPrice;
+
+    /** 배송비 — 기본 + 제주 · 도서 추가 (V5) */
+    @Column(nullable = false)
+    private int shippingFee;
 
     @Column(nullable = false, length = 50)
     private String receiverName;
@@ -106,7 +115,14 @@ public class Order extends BaseEntity {
     public void addItem(OrderItem item) {
         items.add(item);
         item.assignOrder(this);
-        totalPrice += item.getLineTotal();
+        itemsPrice += item.getLineTotal();
+        totalPrice = itemsPrice + shippingFee;
+    }
+
+    /** 상품을 다 담은 뒤 배송비를 정한다 */
+    public void applyShippingFee(int fee) {
+        this.shippingFee = fee;
+        this.totalPrice = itemsPrice + fee;
     }
 
     /** 결제 승인 반영 — 결제대기 → 결제완료 */

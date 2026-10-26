@@ -7,8 +7,9 @@ import com.doldol.api.error.ErrorCode;
 import com.doldol.api.member.Member;
 import com.doldol.api.member.MemberRepository;
 import com.doldol.api.payment.PaymentService;
-import com.doldol.api.product.Product;
-import com.doldol.api.product.ProductRepository;
+import com.doldol.api.product.ProductOption;
+import com.doldol.api.product.ProductOptionRepository;
+import com.doldol.api.shipping.ShippingPolicy;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -26,9 +27,10 @@ public class OrderService {
     private static final DateTimeFormatter ORDER_DATE = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneId.of("Asia/Seoul"));
     private final OrderRepository orderRepository;
     private final CartItemRepository cartItemRepository;
-    private final ProductRepository productRepository;
+    private final ProductOptionRepository productOptionRepository;
     private final MemberRepository memberRepository;
     private final PaymentService paymentService;
+    private final ShippingPolicy shippingPolicy;
 
     @Transactional
     public OrderDetailResponse createOrder(Long memberId, CreateOrderRequest request) {
@@ -39,11 +41,13 @@ public class OrderService {
         Member member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         Order order = Order.create(generateOrderNumber(), member, request);
         for (CartItem cartItem : cartItems) {
-            Product product = cartItem.getProduct();
-            if (!product.isActive()) {throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "판매가 끝난 상품이 있어요: " + product.getName());}
-            if (productRepository.decreaseStock(product.getId(), cartItem.getQuantity()) == 0) {throw new BusinessException(ErrorCode.OUT_OF_STOCK, "재고가 부족해요: " + product.getName());}
-            order.addItem(OrderItem.create(product, cartItem.getQuantity()));
+            ProductOption option = cartItem.getOption();
+            String name = option.getProduct().getName() + " " + option.getName();
+            if (!option.isOnSale()) {throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND, "판매가 끝난 상품이 있어요: " + name);}
+            if (productOptionRepository.decreaseStock(option.getId(), cartItem.getQuantity()) == 0) {throw new BusinessException(ErrorCode.OUT_OF_STOCK, "재고가 부족해요: " + name);}
+            order.addItem(OrderItem.create(option, cartItem.getQuantity()));
         }
+        order.applyShippingFee(shippingPolicy.quote(order.getItemsPrice(), order.getZipcode()).fee());
         orderRepository.save(order);
         cartItemRepository.deleteAllByMemberId(memberId);
         return OrderDetailResponse.from(order);
@@ -59,7 +63,7 @@ public class OrderService {
         Order order = findMine(memberId, orderNumber);
         order.cancel();
         paymentService.refund(order, "고객 요청 취소"); // 결제된 주문이면 환불 — 실패하면 취소도 롤백
-        for (OrderItem item : order.getItems()) {productRepository.increaseStock(item.getProduct().getId(), item.getQuantity());
+        for (OrderItem item : order.getItems()) {productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
         }return OrderDetailResponse.from(order);
     }
 

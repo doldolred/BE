@@ -87,6 +87,11 @@ server {
         proxy_pass http://doldol_backend;
     }
 
+    # 상품 이미지 (파일 이름이 무작위라 바뀌지 않음 → 브라우저가 오래 캐시)
+    location /uploads/ {
+        proxy_pass http://doldol_backend;
+    }
+
     # /actuator 등 나머지 백엔드 경로는 밖으로 열지 않는다 — 화면은 전부 frontend
     location / {
         proxy_pass http://doldol_frontend;

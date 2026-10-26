@@ -25,6 +25,10 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 400 | `INVALID_INPUT` | 요청값 검증 실패 |
 | 401 | `UNAUTHORIZED` | 토큰 없음 / 만료 |
 | 401 | `LOGIN_FAILED` | 이메일 또는 비밀번호 불일치 |
+| 401 | `INVALID_REFRESH_TOKEN` | 로그인 유지 쿠키 없음 · 만료 · 이미 사용됨 |
+| 400 | `PASSWORD_MISMATCH` | 비밀번호 변경 — 현재 비밀번호 틀림 |
+| 400 | `INVALID_RESET_TOKEN` | 비밀번호 재설정 링크 만료 · 사용됨 |
+| 400 | `INVALID_FILE` | 이미지가 아니거나 5MB 초과 |
 | 403 | `FORBIDDEN` | 권한 없음 |
 | 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` | 대상 없음 |
 | 409 | `DUPLICATE_EMAIL` | 이미 가입된 이메일 |
@@ -41,10 +45,15 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 
 ```json
 // 요청
-{ "email": "a@doldol.com", "password": "password1!", "name": "홍길동", "phone": "010-1234-5678" }
+{
+  "email": "a@doldol.com", "password": "password1!", "name": "홍길동", "phone": "010-1234-5678",
+  "agreeTerms": true, "agreePrivacy": true, "agreeAge": true, "agreeMarketing": false
+}
 ```
 
 - `email` 필수·이메일 형식, `password` 필수 8~64자, `name` 필수 50자 이하, `phone` 선택
+- 동의: `agreeTerms`(이용약관) · `agreePrivacy`(개인정보 수집·이용) · `agreeAge`(만 14세 이상) **필수 true**, `agreeMarketing` 선택.
+  동의 시각은 회원에 저장된다 (V6)
 
 `201 Created`
 ```json
@@ -58,41 +67,101 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 { "email": "a@doldol.com", "password": "password1!" }
 ```
 
-`200 OK`
+`200 OK` + **`Set-Cookie: doldol_rt=…; Path=/api/auth; HttpOnly; SameSite=Lax; Max-Age=1209600`** (운영은 `Secure`)
 ```json
 {
   "accessToken": "eyJhbGciOi...",
   "tokenType": "Bearer",
-  "expiresIn": 7200,
+  "expiresIn": 1800,
   "member": { "id": 1, "email": "a@doldol.com", "name": "홍길동", "role": "USER" }
 }
 ```
 
-`expiresIn`은 초 단위입니다.
+- 액세스 토큰은 30분(`expiresIn` 초). 로그인 유지(14일)는 리프레시 토큰 쿠키 — 자바스크립트가 읽을 수 없고 `/api/auth/**` 요청에만 실린다
+
+### `POST /api/auth/refresh` 로그인 유지
+
+쿠키만 있으면 된다(본문 없음). 로그인과 같은 응답 + **새 쿠키**(한 번 쓴 리프레시 토큰은 폐기).
+쿠키가 없거나 만료 · 이미 사용됨 → `401 INVALID_REFRESH_TOKEN` (FE 는 로그아웃 처리)
+
+### `POST /api/auth/logout`
+
+이 기기의 리프레시 토큰을 지우고 쿠키를 비운다. `204`
+
+### `POST /api/auth/password/forgot` 비밀번호 찾기
+
+`{ "email": "a@doldol.com" }` → 항상 `204` (가입 여부를 알려 주지 않음).
+가입된 이메일이면 `{FRONTEND_URL}/password/reset?token=…` 링크를 메일로 보낸다 — 30분, 한 번만. 새로 요청하면 이전 링크는 무효
+
+### `POST /api/auth/password/reset`
+
+`{ "token": "메일 링크의 token", "newPassword": "8~64자" }` → `204`. 모든 기기에서 로그아웃된다.
+만료 · 사용된 링크 → `400 INVALID_RESET_TOKEN`
 
 ### 🔒 `GET /api/members/me` 내 정보
 
 `200 OK`
 ```json
-{ "id": 1, "email": "a@doldol.com", "name": "홍길동", "phone": "010-1234-5678", "role": "USER" }
+{ "id": 1, "email": "a@doldol.com", "name": "홍길동", "phone": "010-1234-5678", "role": "USER", "marketingAgreed": false }
 ```
+
+### 🔒 `PATCH /api/members/me/password` 비밀번호 변경
+
+`{ "currentPassword": "…", "newPassword": "8~64자" }` → 로그인과 같은 응답 + 새 쿠키 (다른 기기는 로그아웃).
+현재 비밀번호가 틀리면 `400 PASSWORD_MISMATCH`
+
+### 🔒 `PATCH /api/members/me/marketing` 마케팅 수신 동의 변경
+
+`{ "agreed": true }` → `MemberResponse`
 
 ---
 
 ## 상품
+
+가격 · 재고는 **옵션**(10포 · 30포 · 60포)마다 있다. 장바구니 · 주문은 옵션을 담는다 (V5).
 
 ### `GET /api/products` 상품 목록 (판매중만)
 
 `200 OK`
 ```json
 [
-  { "id": 1, "name": "돌돌 비트즙 30포", "description": "...", "price": 39000, "stock": 100, "imageUrl": null }
+  {
+    "id": 1,
+    "name": "돌돌 제주산 100% NFC 레드비트즙",
+    "description": "...",
+    "imageUrl": "/uploads/products/202610/….webp",
+    "minPrice": 38000,
+    "soldOut": false,
+    "options": [
+      { "id": 1, "name": "10포", "listPrice": 16000, "price": 13900, "discountRate": 13, "stock": 0, "soldOut": true },
+      { "id": 2, "name": "30포", "listPrice": 48000, "price": 38000, "discountRate": 20, "stock": 100, "soldOut": false },
+      { "id": 3, "name": "60포", "listPrice": 96000, "price": 75000, "discountRate": 21, "stock": 50, "soldOut": false }
+    ]
+  }
 ]
 ```
+
+- `options` 는 판매중인 옵션만, 정한 순서대로. `listPrice` 정상가 · `price` 판매가 · `discountRate` 할인율(%, 내림)
+- `minPrice`: 품절 아닌 옵션 중 최저가 (다 품절이면 전체 중) — 목록에 "38,000원~"
+- 상품 이미지는 `/uploads/…` (같은 도메인, 오래 캐시)
 
 ### `GET /api/products/{id}` 상품 상세
 
 `200 OK` — 목록 항목과 같은 형태
+
+---
+
+## 배송비
+
+기본 3,000원, **상품 금액 50,000원 이상 무료**. 제주 · 도서산간은 무료배송이어도 추가 (우편번호 구간 — 관리자 화면에서 관리).
+처음에는 제주(63000~63644, +3,000) · 울릉도(40200~40240, +5,000)만 들어 있다.
+
+### `GET /api/shipping/quote?itemsPrice=38000&zipcode=63100` 배송비 미리보기 (로그인 없이)
+
+`zipcode` 는 선택(숫자 5자리)
+```json
+{ "baseFee": 3000, "extraFee": 3000, "areaName": "제주", "fee": 6000, "freeThreshold": 50000 }
+```
 
 ---
 
@@ -107,21 +176,31 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
     {
       "id": 10,
       "productId": 1,
-      "productName": "돌돌 비트즙 30포",
+      "productName": "돌돌 제주산 100% NFC 레드비트즙",
+      "optionId": 2,
+      "optionName": "30포",
       "imageUrl": null,
-      "unitPrice": 39000,
-      "quantity": 2,
-      "lineTotal": 78000
+      "unitPrice": 38000,
+      "quantity": 1,
+      "lineTotal": 38000,
+      "stock": 100,
+      "onSale": true
     }
   ],
-  "totalPrice": 78000
+  "itemsPrice": 38000,
+  "shippingFee": 3000,
+  "freeShippingThreshold": 50000,
+  "totalPrice": 41000
 }
 ```
+
+- `shippingFee` 는 기본 배송비 미리보기 — 제주 · 도서 추가는 주문서에서 우편번호로(`/api/shipping/quote`)
+- `onSale: false` = 판매중지된 옵션 (주문 불가, 삭제 안내)
 
 | API | 요청 | 설명 |
 | --- | --- | --- |
 | `GET /api/cart` | | 내 장바구니 |
-| `POST /api/cart/items` | `{ "productId": 1, "quantity": 1 }` | 담기. 이미 있으면 수량 더함 |
+| `POST /api/cart/items` | `{ "optionId": 2, "quantity": 1 }` | 담기. 이미 있으면 수량 더함. 품절이면 `409 OUT_OF_STOCK` |
 | `PATCH /api/cart/items/{itemId}` | `{ "quantity": 3 }` | 수량 변경 (1 이상) |
 | `DELETE /api/cart/items/{itemId}` | | 삭제 |
 
@@ -142,7 +221,8 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 
 ### `POST /api/orders` 주문하기
 
-장바구니 전체를 주문합니다. 성공하면 재고가 차감되고 장바구니가 비워집니다.
+장바구니 전체를 주문합니다. 성공하면 옵션 재고가 차감되고 장바구니가 비워집니다.
+배송비는 서버가 우편번호로 계산해 `totalPrice = itemsPrice + shippingFee` 로 정한다 (결제 금액).
 
 ```json
 // 요청
@@ -167,7 +247,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
     "orderNumber": "20261019-000001",
     "status": "PENDING_PAYMENT",
     "totalPrice": 78000,
-    "itemSummary": "돌돌 비트즙 30포 외 1건",
+    "itemSummary": "돌돌 제주산 100% NFC 레드비트즙 30포 외 1건",
     "createdAt": "2026-10-19T02:43:58Z"
   }
 ]
@@ -180,7 +260,9 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 {
   "orderNumber": "20261019-000001",
   "status": "PENDING_PAYMENT",
-  "totalPrice": 78000,
+  "itemsPrice": 38000,
+  "shippingFee": 3000,
+  "totalPrice": 41000,
   "receiverName": "홍길동",
   "receiverPhone": "010-1234-5678",
   "zipcode": "06236",
@@ -188,7 +270,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
   "address2": "4층",
   "memo": "문 앞에 놓아주세요",
   "items": [
-    { "productId": 1, "productName": "돌돌 비트즙 30포", "unitPrice": 39000, "quantity": 2, "lineTotal": 78000 }
+    { "productId": 1, "productName": "돌돌 제주산 100% NFC 레드비트즙", "optionId": 2, "optionName": "30포", "unitPrice": 38000, "quantity": 1, "lineTotal": 38000 }
   ],
   "payment": null,
   "createdAt": "2026-10-19T02:43:58Z"
@@ -410,6 +492,38 @@ BE 가 할 일:
 
 상품은 지우지 않는다 — 지난 주문이 참조하고 있어서 **판매 중지**로 숨긴다. 판매 중지 상품은 고객 목록 · 상세에서 안 보인다(404). 가격을 바꿔도 지난 주문의 금액은 그대로.
 
+#### 상품 요청 본문 (V5 — 옵션)
+
+```json
+{
+  "name": "돌돌 제주산 100% NFC 레드비트즙", "description": "…", "imageUrl": "/uploads/…", "active": true,
+  "options": [
+    { "id": 2, "name": "30포", "listPrice": 48000, "price": 38000, "stock": 100, "active": true },
+    { "name": "90포", "listPrice": 144000, "price": 110000, "stock": 10, "active": true }
+  ]
+}
+```
+
+- 옵션은 **전부** 보낸다: `id` 가 있으면 수정, 없으면 추가, 목록에서 빠진 기존 옵션은 판매중지(`active=false`, 지난 주문이 가리키므로 지우지 않음). 순서 = 배열 순서
+- 응답 `AdminProductResponse` 의 `options` 에는 판매중지된 옵션도 들어 있다 (`sortOrder` · `active` 포함)
+
+#### 🔒 `POST /api/admin/uploads` 상품 이미지 올리기
+
+`multipart/form-data`, 파트 이름 `file`. jpg · png · webp · gif, 5MB 이하 (파일 내용으로 판별, 이름은 새로 지음).
+`201` `{ "url": "/uploads/products/202610/{uuid}.png" }` → 상품 `imageUrl` 에 넣는다. 서버 디스크(운영: 도커 볼륨)에 저장, 매일 백업
+
+### 배송 지역 (추가 배송비)
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/shipping/areas` | 목록 `[{ "id", "name", "zipFrom", "zipTo", "extraFee" }]` |
+| `POST /api/admin/shipping/areas` | `{ "name": "신안군", "zipFrom": "58800", "zipTo": "58866", "extraFee": 5000 }` → `201` |
+| `DELETE /api/admin/shipping/areas/{id}` | `204` |
+
+### 첫 관리자
+
+서버를 켤 때 `INITIAL_ADMIN_EMAILS`(쉼표로 여러 개)에 적힌 **이미 가입한** 회원을 관리자로 바꾼다. 가입 → `.env` 에 적기 → 재시작.
+
 ### 회원관리
 
 #### `GET /api/admin/members?keyword=&page=0&size=20`
@@ -442,5 +556,4 @@ BE 가 할 일:
 
 ## 나중에 추가
 
-- 관리자 화면(FE), 상품 이미지 업로드, 엑셀 내보내기
-- 리프레시 토큰, 배송비 정책
+- 엑셀 내보내기, 1:1 문의, 리뷰, 정기구독, 회원 등급

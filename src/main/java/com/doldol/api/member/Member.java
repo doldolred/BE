@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,15 +32,32 @@ public class Member extends BaseEntity{
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length =20)
     private Role role;
-    public static Member create(String email, String encodedPassword, String name, String phone){
+    /** 가입 동의 (V6) — 이용약관 · 개인정보 수집 · 이용은 필수, 마케팅 수신은 선택 */
+    private Instant termsAgreedAt;
+    private Instant privacyAgreedAt;
+    @Column(nullable = false)
+    private boolean marketingAgreed;
+    /** 마케팅 수신에 마지막으로 동의 / 철회한 시각 */
+    private Instant marketingAgreedAt;
+    public static Member create(String email, String encodedPassword, String name, String phone, boolean marketingAgreed){
         Member member = new Member();
+        Instant now = Instant.now();
         member.email = email;
         member.password = encodedPassword;
         member.name = name;
         member.phone = phone;
         member.role = Role.USER;
+        member.termsAgreedAt = now;
+        member.privacyAgreedAt = now;
+        member.marketingAgreed = marketingAgreed;
+        member.marketingAgreedAt = now;
         return member;
     }
 //관리자 권한 변경
     public void changeRole(Role role){this.role = role;}
+    public void changePassword(String encodedPassword){this.password = encodedPassword;}
+    public void changeMarketingAgreed(boolean agreed){
+        this.marketingAgreed = agreed;
+        this.marketingAgreedAt = Instant.now();
+    }
 }
