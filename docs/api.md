@@ -30,7 +30,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 400 | `INVALID_RESET_TOKEN` | 비밀번호 재설정 링크 만료 · 사용됨 |
 | 400 | `INVALID_FILE` | 이미지가 아니거나 5MB 초과 |
 | 403 | `FORBIDDEN` | 권한 없음 |
-| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` | 대상 없음 |
+| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
 | 409 | `DUPLICATE_EMAIL` | 이미 가입된 이메일 |
 | 409 | `OUT_OF_STOCK` | 재고 부족 |
 | 409 | `CART_EMPTY` | 빈 장바구니로 주문 |
@@ -162,6 +162,23 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 ```json
 { "baseFee": 3000, "extraFee": 3000, "areaName": "제주", "fee": 6000, "freeThreshold": 50000 }
 ```
+
+---
+
+## 공지사항 (로그인 없이)
+
+공개(`published`)된 것만. 순서: 고정(`pinned`) 먼저 → 최신순. 본문은 일반 글(HTML 아님, 줄바꿈 그대로 보여 준다)
+
+```json
+// NoticeResponse
+{ "id": 1, "title": "추석 연휴 배송 안내", "content": "9/14 ~ 9/18 출고 쉽니다.", "pinned": true, "published": true,
+  "createdAt": "2026-10-27T00:05:52Z", "updatedAt": "2026-10-27T00:05:52Z" }
+```
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/notices?page=0&size=20` | `PageResponse<NoticeResponse>` (size 최대 50) |
+| `GET /api/notices/{id}` | 비공개 · 없는 공지 → `404 NOTICE_NOT_FOUND` |
 
 ---
 
@@ -520,6 +537,16 @@ BE 가 할 일:
 | `POST /api/admin/shipping/areas` | `{ "name": "신안군", "zipFrom": "58800", "zipTo": "58866", "extraFee": 5000 }` → `201` |
 | `DELETE /api/admin/shipping/areas/{id}` | `204` |
 
+### 공지사항 (V7)
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/notices?page=0&size=20` | 비공개 포함 전부, 손님 화면과 같은 순서 (size 최대 100) |
+| `GET /api/admin/notices/{id}` | |
+| `POST /api/admin/notices` | `{ "title": "100자 이하", "content": "20,000자 이하", "pinned": false, "published": true }` → `201` |
+| `PUT /api/admin/notices/{id}` | 같은 본문 → `200` |
+| `DELETE /api/admin/notices/{id}` | `204` |
+
 ### 첫 관리자
 
 서버를 켤 때 `INITIAL_ADMIN_EMAILS`(쉼표로 여러 개)에 적힌 **이미 가입한** 회원을 관리자로 바꾼다. 가입 → `.env` 에 적기 → 재시작.
@@ -556,4 +583,4 @@ BE 가 할 일:
 
 ## 나중에 추가
 
-- 엑셀 내보내기, 1:1 문의, 리뷰, 정기구독, 회원 등급
+- 엑셀 내보내기, 1:1 문의, 리뷰, 배너 문구, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급
