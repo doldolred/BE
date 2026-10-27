@@ -30,11 +30,12 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 400 | `INVALID_RESET_TOKEN` | 비밀번호 재설정 링크 만료 · 사용됨 |
 | 400 | `INVALID_FILE` | 이미지가 아니거나 5MB 초과 |
 | 403 | `FORBIDDEN` | 권한 없음 |
-| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
+| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` / `INQUIRY_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
 | 409 | `DUPLICATE_EMAIL` | 이미 가입된 이메일 |
 | 409 | `OUT_OF_STOCK` | 재고 부족 |
 | 409 | `CART_EMPTY` | 빈 장바구니로 주문 |
 | 409 | `ORDER_NOT_CANCELLABLE` | 취소할 수 없는 주문 상태 |
+| 409 | `INQUIRY_ALREADY_ANSWERED` | 답이 달린 문의 삭제 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 |
 
 ---
@@ -196,6 +197,27 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 ```
 - `theme`: `RED`(#E4002B) · `BLACK` · `WHITE`
 - `linkUrl`: 사이트 안 경로(`/products/1`) 또는 `https://` 주소, 없으면 `null`(글만)
+
+---
+
+## 🔒 1:1 문의 (V9)
+
+회원이 묻고 관리자가 답한다. 처음 답이 달리면 회원에게 알림 메일(`{FRONTEND_URL}/mypage/inquiries/{id}` 링크)
+
+```json
+// InquiryResponse
+{ "id": 1, "category": "SHIPPING", "title": "언제 와요?", "content": "…", "orderNumber": "20261027-429918",
+  "status": "WAITING", "answer": null, "answeredAt": null, "createdAt": "…" }
+```
+- `category`: `ORDER`(주문·결제) · `SHIPPING`(배송) · `PRODUCT`(상품) · `CANCEL`(취소·반품·교환) · `MEMBER`(회원 정보) · `ETC`(기타)
+- `status`: `WAITING`(답변 대기) · `ANSWERED`(답변 완료)
+
+| API | 요청 | 설명 |
+| --- | --- | --- |
+| `POST /api/inquiries` | `{ "category", "title": "100자", "content": "5,000자", "orderNumber": "선택" }` | `201`. 주문번호가 내 주문이 아니면 `404 ORDER_NOT_FOUND` |
+| `GET /api/inquiries?page=0&size=20` | | 내 문의, 최신순 (`PageResponse`) |
+| `GET /api/inquiries/{id}` | | 남의 문의 · 없음 → `404 INQUIRY_NOT_FOUND` |
+| `DELETE /api/inquiries/{id}` | | 답 전에만 `204`, 답이 달렸으면 `409 INQUIRY_ALREADY_ANSWERED` |
 
 ---
 
@@ -582,6 +604,15 @@ BE 가 할 일:
 - `endsAt` 이 `startsAt` 보다 앞이거나 같으면 `400 INVALID_INPUT`
 - 처음에 "5만원 이상 구매 시 무료배송"(RED) 한 줄이 들어 있다
 
+### 문의함 (V9)
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/inquiries?status=WAITING&page=0&size=20` | `status` 빼면 전부. 최신순. `InquiryResponse` + `memberId` · `memberEmail` · `memberName` |
+| `GET /api/admin/inquiries/waiting-count` | `{ "count": 3 }` — 메뉴의 답변 대기 수 |
+| `GET /api/admin/inquiries/{id}` | |
+| `PUT /api/admin/inquiries/{id}/answer` | `{ "answer": "5,000자 이하" }` → 답하기 · 고치기. 알림 메일은 처음 답할 때만 |
+
 ### 첫 관리자
 
 서버를 켤 때 `INITIAL_ADMIN_EMAILS`(쉼표로 여러 개)에 적힌 **이미 가입한** 회원을 관리자로 바꾼다. 가입 → `.env` 에 적기 → 재시작.
@@ -618,4 +649,4 @@ BE 가 할 일:
 
 ## 나중에 추가
 
-- 엑셀 내보내기, 1:1 문의, 리뷰, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급
+- 엑셀 내보내기, 리뷰, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급

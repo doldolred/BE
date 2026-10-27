@@ -29,6 +29,7 @@ public enum ErrorCode {
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
     NOTICE_NOT_FOUND(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다."),
     BANNER_NOT_FOUND(HttpStatus.NOT_FOUND, "배너를 찾을 수 없습니다."),
+    INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "문의를 찾을 수 없습니다."),
 
     // 409
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
@@ -40,6 +41,7 @@ public enum ErrorCode {
     ORDER_NOT_PAYABLE(HttpStatus.CONFLICT, "결제할 수 없는 주문입니다."),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "결제 금액이 주문 금액과 다릅니다."),
     PAYMENT_NOT_COMPLETED(HttpStatus.CONFLICT, "결제가 완료되지 않았습니다."),
+    INQUIRY_ALREADY_ANSWERED(HttpStatus.CONFLICT, "답변이 달린 문의는 지울 수 없어요."),
 
     // 400 (관리자)
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "조회 기간을 확인해 주세요. (최대 1년)"),
