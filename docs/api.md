@@ -30,7 +30,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 400 | `INVALID_RESET_TOKEN` | 비밀번호 재설정 링크 만료 · 사용됨 |
 | 400 | `INVALID_FILE` | 이미지가 아니거나 5MB 초과 |
 | 403 | `FORBIDDEN` | 권한 없음 |
-| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
+| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
 | 409 | `DUPLICATE_EMAIL` | 이미 가입된 이메일 |
 | 409 | `OUT_OF_STOCK` | 재고 부족 |
 | 409 | `CART_EMPTY` | 빈 장바구니로 주문 |
@@ -179,6 +179,23 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | --- | --- |
 | `GET /api/notices?page=0&size=20` | `PageResponse<NoticeResponse>` (size 최대 50) |
 | `GET /api/notices/{id}` | 비공개 · 없는 공지 → `404 NOTICE_NOT_FOUND` |
+
+---
+
+## 띠배너 (로그인 없이)
+
+쇼핑몰 맨 위 한 줄 문구. 여러 개면 FE 가 돌아가며 보여 준다.
+
+### `GET /api/banners` 지금 보여 줄 배너
+
+`active` 이고 기간 안(`startsAt` ≤ 지금 < `endsAt`, 비어 있으면 제한 없음)인 것만, `sortOrder` → `id` 순
+```json
+// BannerResponse
+[{ "id": 1, "message": "5만원 이상 구매 시 무료배송", "linkUrl": null, "theme": "RED",
+   "startsAt": null, "endsAt": null, "active": true, "sortOrder": 0 }]
+```
+- `theme`: `RED`(#E4002B) · `BLACK` · `WHITE`
+- `linkUrl`: 사이트 안 경로(`/products/1`) 또는 `https://` 주소, 없으면 `null`(글만)
 
 ---
 
@@ -547,6 +564,24 @@ BE 가 할 일:
 | `PUT /api/admin/notices/{id}` | 같은 본문 → `200` |
 | `DELETE /api/admin/notices/{id}` | `204` |
 
+### 띠배너 (V8)
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/banners` | 꺼진 것 · 기간 지난 것 포함 전부, `sortOrder` → `id` 순 |
+| `POST /api/admin/banners` | `BannerRequest` → `201` |
+| `PUT /api/admin/banners/{id}` | `BannerRequest` → `200` |
+| `DELETE /api/admin/banners/{id}` | `204` |
+
+```json
+// BannerRequest
+{ "message": "80자 이하", "linkUrl": "/products/1 | https://… | 빈 값", "theme": "RED",
+  "startsAt": "2026-11-01T00:00:00Z", "endsAt": null, "active": true, "sortOrder": 0 }
+```
+- 링크는 `/`로 시작하는 경로(`//` 제외)나 `https://` 만 — 그 밖은 `400`
+- `endsAt` 이 `startsAt` 보다 앞이거나 같으면 `400 INVALID_INPUT`
+- 처음에 "5만원 이상 구매 시 무료배송"(RED) 한 줄이 들어 있다
+
 ### 첫 관리자
 
 서버를 켤 때 `INITIAL_ADMIN_EMAILS`(쉼표로 여러 개)에 적힌 **이미 가입한** 회원을 관리자로 바꾼다. 가입 → `.env` 에 적기 → 재시작.
@@ -583,4 +618,4 @@ BE 가 할 일:
 
 ## 나중에 추가
 
-- 엑셀 내보내기, 1:1 문의, 리뷰, 배너 문구, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급
+- 엑셀 내보내기, 1:1 문의, 리뷰, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급
