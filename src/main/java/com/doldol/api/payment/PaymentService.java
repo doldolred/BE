@@ -1,5 +1,6 @@
 package com.doldol.api.payment;
 
+import com.doldol.api.coupon.CouponService;
 import com.doldol.api.error.BusinessException;
 import com.doldol.api.error.ErrorCode;
 import com.doldol.api.order.Order;
@@ -39,6 +40,8 @@ public class PaymentService {
 	private final NicepayClient nicepayClient;
 
 	private final TransactionTemplate tx;
+
+	private final CouponService couponService;
 
 	// ───────── 결제 승인 ─────────
 
@@ -179,6 +182,7 @@ public class PaymentService {
 		for (OrderItem item : order.getItems()) {
 			productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
 		}
+		couponService.release(order); // 결제 안 한 주문에 쓴 할인코드는 되돌린다
 	}
 
 	// ───────── 도우미 ─────────

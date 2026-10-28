@@ -2,6 +2,7 @@ package com.doldol.api.order;
 
 import com.doldol.api.cart.CartItem;
 import com.doldol.api.cart.CartItemRepository;
+import com.doldol.api.coupon.CouponService;
 import com.doldol.api.error.BusinessException;
 import com.doldol.api.error.ErrorCode;
 import com.doldol.api.member.Member;
@@ -31,6 +32,7 @@ public class OrderService {
     private final MemberRepository memberRepository;
     private final PaymentService paymentService;
     private final ShippingPolicy shippingPolicy;
+    private final CouponService couponService;
 
     @Transactional
     public OrderDetailResponse createOrder(Long memberId, CreateOrderRequest request) {
@@ -47,8 +49,12 @@ public class OrderService {
             if (productOptionRepository.decreaseStock(option.getId(), cartItem.getQuantity()) == 0) {throw new BusinessException(ErrorCode.OUT_OF_STOCK, "재고가 부족해요: " + name);}
             order.addItem(OrderItem.create(option, cartItem.getQuantity()));
         }
-        order.applyShippingFee(shippingPolicy.quote(order.getItemsPrice(), order.getZipcode()).fee());
         orderRepository.save(order);
+        // 할인코드 (V11) — 상품 금액에서 깎는다. 무료배송 기준은 할인 전 상품 금액
+        if (request.couponCode() != null && !request.couponCode().isBlank()) {
+            couponService.apply(order, member, request.couponCode());
+        }
+        order.applyShippingFee(shippingPolicy.quote(order.getItemsPrice(), order.getZipcode()).fee());
         cartItemRepository.deleteAllByMemberId(memberId);
         return OrderDetailResponse.from(order);
     }
@@ -63,6 +69,7 @@ public class OrderService {
         Order order = findMine(memberId, orderNumber);
         order.cancel();
         paymentService.refund(order, "고객 요청 취소"); // 결제된 주문이면 환불 — 실패하면 취소도 롤백
+        couponService.release(order); // 쓴 할인코드는 다시 쓸 수 있게
         for (OrderItem item : order.getItems()) {productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
         }return OrderDetailResponse.from(order);
     }

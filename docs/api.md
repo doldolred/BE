@@ -30,13 +30,14 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 400 | `INVALID_RESET_TOKEN` | 비밀번호 재설정 링크 만료 · 사용됨 |
 | 400 | `INVALID_FILE` | 이미지가 아니거나 5MB 초과 |
 | 403 | `FORBIDDEN` | 권한 없음 |
-| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` / `INQUIRY_NOT_FOUND` / `REVIEW_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
+| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` / `INQUIRY_NOT_FOUND` / `REVIEW_NOT_FOUND` / `COUPON_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
 | 409 | `DUPLICATE_EMAIL` | 이미 가입된 이메일 |
 | 409 | `OUT_OF_STOCK` | 재고 부족 |
 | 409 | `CART_EMPTY` | 빈 장바구니로 주문 |
 | 409 | `ORDER_NOT_CANCELLABLE` | 취소할 수 없는 주문 상태 |
 | 409 | `INQUIRY_ALREADY_ANSWERED` | 답이 달린 문의 삭제 |
 | 409 | `REVIEW_NOT_WRITABLE` / `REVIEW_ALREADY_WRITTEN` | 후기 — 배송 전 · 남의 상품 / 이미 씀 |
+| 409 | `COUPON_NOT_USABLE` / `COUPON_IN_USE` / `DUPLICATE_COUPON_CODE` | 할인코드 — 쓸 수 없음(이유는 message) / 쓴 코드 삭제 / 코드 중복 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 |
 
 ---
@@ -246,6 +247,25 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 
 - 배송 전 · 남의 주문 상품 → `409 REVIEW_NOT_WRITABLE`, 이미 쓴 상품 → `409 REVIEW_ALREADY_WRITTEN`
 - `imageUrls` 는 `/uploads/reviews/` 로 올린 주소만 (`400`)
+
+---
+
+## 🔒 할인코드 (V11)
+
+주문서에서 코드를 넣으면 **상품 금액에서** 깎는다 (배송비는 그대로). 무료배송 기준(5만원)은 **할인 전** 상품 금액.
+결제 금액이 1,000원(결제사 최소) 아래로는 내려가지 않는다. 주문이 취소되면(고객 · 관리자 · 미결제 자동 취소) 코드를 다시 쓸 수 있다.
+
+### `GET /api/coupons/check?code=AUTUMN10` 미리보기
+
+지금 장바구니 상품 금액 기준 → `{ "code": "AUTUMN10", "name": "가을 할인", "itemsPrice": 38000, "discountAmount": 3800 }`
+- 코드는 대소문자 상관없음 (대문자로 맞춘다)
+- 없는 코드 `404 COUPON_NOT_FOUND`, 장바구니가 비면 `409 CART_EMPTY`
+- 쓸 수 없으면 `409 COUPON_NOT_USABLE` — `message` 에 이유: 기간 전 · 기간 끝 · 꺼짐 · 수량 소진 · 이미 사용 · 최소 주문 금액
+
+### 주문에 적용
+
+`POST /api/orders` 본문에 `"couponCode": "AUTUMN10"` (선택). 서버가 다시 계산해 주문에 남긴다.
+주문 응답(`OrderDetailResponse`)에 `discountAmount` · `couponCode` 가 생겼다: `totalPrice = itemsPrice - discountAmount + shippingFee`
 
 ---
 
@@ -648,6 +668,23 @@ BE 가 할 일:
 | `GET /api/admin/reviews?filter=ALL&page=0&size=20` | `filter`: `ALL` · `HIDDEN` · `BEST` · `NO_REPLY`. 최신순, 작성자 이름 · 이메일 그대로 |
 | `PATCH /api/admin/reviews/{id}` | `{ "hidden": true, "best": true, "reply": "1,000자" }` — 보낸 것만 바꾼다. `reply: ""` 이면 답글 삭제 |
 
+### 할인코드 (V11)
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/coupons` | 전부 (최근 만든 순). `usedCount` = 지금까지 쓴 횟수 (취소된 주문 제외) |
+| `POST /api/admin/coupons` | `CouponRequest` → `201`. 같은 코드 `409 DUPLICATE_COUPON_CODE` |
+| `PUT /api/admin/coupons/{id}` | `CouponRequest` — **코드는 바뀌지 않는다** (보낸 code 무시) |
+| `DELETE /api/admin/coupons/{id}` | 한 번도 안 쓴 코드만 `204`, 쓴 코드는 `409 COUPON_IN_USE` (끄기만) |
+
+```json
+// CouponRequest
+{ "code": "AUTUMN10", "name": "가을 할인", "discountType": "PERCENT", "discountValue": 10, "maxDiscount": 5000,
+  "minOrderAmount": 30000, "startsAt": null, "endsAt": "2026-11-30T15:00:00Z", "usageLimit": 100, "perMemberLimit": 1, "active": true }
+```
+- `discountType`: `AMOUNT`(원) · `PERCENT`(% , 1~90, `maxDiscount` 로 상한 — 비우면 상한 없음)
+- `code`: 영문 · 숫자 · `-` · `_` 3~30자. `usageLimit` 비우면 무제한
+
 ### 첫 관리자
 
 서버를 켤 때 `INITIAL_ADMIN_EMAILS`(쉼표로 여러 개)에 적힌 **이미 가입한** 회원을 관리자로 바꾼다. 가입 → `.env` 에 적기 → 재시작.
@@ -684,4 +721,4 @@ BE 가 할 일:
 
 ## 나중에 추가
 
-- 엑셀 내보내기, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급
+- 엑셀 내보내기, 취소 · 반품 · 교환, 정기구독, 회원 등급

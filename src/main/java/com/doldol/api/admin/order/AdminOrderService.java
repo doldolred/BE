@@ -1,6 +1,7 @@
 package com.doldol.api.admin.order;
 import com.doldol.api.admin.AdminPeriod;
 import com.doldol.api.common.PageResponse;
+import com.doldol.api.coupon.CouponService;
 import com.doldol.api.error.BusinessException;
 import com.doldol.api.error.ErrorCode;
 import com.doldol.api.order.Order;
@@ -28,6 +29,7 @@ public class AdminOrderService {
     private final AdminOrderRepository adminOrderRepository;
     private final ProductOptionRepository productOptionRepository;
     private final PaymentService paymentService;
+    private final CouponService couponService;
     public PageResponse<AdminOrderSummaryResponse> search(OrderStatus status, LocalDate from, LocalDate to, String keyword, int page, int size){
         Set<OrderStatus>statuses = status == null ? EnumSet.allOf(OrderStatus.class) : EnumSet.of(status);
         Instant start = from == null ? MIN_TIME : from.atStartOfDay(AdminPeriod.KST).toInstant();
@@ -47,6 +49,7 @@ public class AdminOrderService {
         }
         if (request.status() == OrderStatus.CANCELLED) {
             paymentService.refund(order, "관리자 취소"); // 결제된 주문이면 환불 — 실패하면 상태 변경도 롤백
+            couponService.release(order); // 쓴 할인코드는 다시 쓸 수 있게
             for (OrderItem item : order.getItems()) {
                 productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
             }

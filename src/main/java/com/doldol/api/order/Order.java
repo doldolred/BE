@@ -50,7 +50,7 @@ public class Order extends BaseEntity {
     @Column(nullable = false, length = 20)
     private OrderStatus status;
 
-    /** 결제 금액 = itemsPrice + shippingFee */
+    /** 결제 금액 = itemsPrice - discountAmount + shippingFee */
     @Column(nullable = false)
     private int totalPrice;
 
@@ -61,6 +61,14 @@ public class Order extends BaseEntity {
     /** 배송비 — 기본 + 제주 · 도서 추가 (V5) */
     @Column(nullable = false)
     private int shippingFee;
+
+    /** 쓴 할인코드 (V11) — 주문이 취소돼도 기록으로 남는다 */
+    @Column(length = 30)
+    private String couponCode;
+
+    /** 할인 금액 (V11) — 상품 금액에서만 깎는다 */
+    @Column(nullable = false)
+    private int discountAmount;
 
     @Column(nullable = false, length = 50)
     private String receiverName;
@@ -116,13 +124,24 @@ public class Order extends BaseEntity {
         items.add(item);
         item.assignOrder(this);
         itemsPrice += item.getLineTotal();
-        totalPrice = itemsPrice + shippingFee;
+        recalculate();
     }
 
     /** 상품을 다 담은 뒤 배송비를 정한다 */
     public void applyShippingFee(int fee) {
         this.shippingFee = fee;
-        this.totalPrice = itemsPrice + fee;
+        recalculate();
+    }
+
+    /** 할인코드 적용 (V11) — 금액 계산 · 검사는 CouponService 가 한다 */
+    public void applyDiscount(String couponCode, int discountAmount) {
+        this.couponCode = couponCode;
+        this.discountAmount = discountAmount;
+        recalculate();
+    }
+
+    private void recalculate() {
+        totalPrice = itemsPrice - discountAmount + shippingFee;
     }
 
     /** 결제 승인 반영 — 결제대기 → 결제완료 */

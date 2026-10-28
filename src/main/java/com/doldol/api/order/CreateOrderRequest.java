@@ -21,4 +21,7 @@ public record CreateOrderRequest(
         @Size(max = 255, message = "상세주소가 너무 깁니다.")
         String address2,
         @Size(max = 255, message = "배송 메모는 255자 이하로 입력해 주세요.")
-        String memo) {}
+        String memo,
+        // 선택 — 할인코드 (V11)
+        @Size(max = 30, message = "할인코드가 너무 깁니다.")
+        String couponCode) {}
