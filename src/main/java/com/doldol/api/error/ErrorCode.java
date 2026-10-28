@@ -30,6 +30,7 @@ public enum ErrorCode {
     NOTICE_NOT_FOUND(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다."),
     BANNER_NOT_FOUND(HttpStatus.NOT_FOUND, "배너를 찾을 수 없습니다."),
     INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "문의를 찾을 수 없습니다."),
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "후기를 찾을 수 없습니다."),
 
     // 409
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
@@ -42,6 +43,8 @@ public enum ErrorCode {
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "결제 금액이 주문 금액과 다릅니다."),
     PAYMENT_NOT_COMPLETED(HttpStatus.CONFLICT, "결제가 완료되지 않았습니다."),
     INQUIRY_ALREADY_ANSWERED(HttpStatus.CONFLICT, "답변이 달린 문의는 지울 수 없어요."),
+    REVIEW_NOT_WRITABLE(HttpStatus.CONFLICT, "배송 완료된 내 주문 상품에만 후기를 쓸 수 있어요."),
+    REVIEW_ALREADY_WRITTEN(HttpStatus.CONFLICT, "이미 후기를 쓴 상품이에요."),
 
     // 400 (관리자)
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "조회 기간을 확인해 주세요. (최대 1년)"),

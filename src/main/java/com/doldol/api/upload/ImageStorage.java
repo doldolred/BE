@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * 상품 이미지 저장 — 서버 디스크(app.upload.dir, 운영은 도커 볼륨)에 두고 /uploads/... 로 보여 준다.
+ * 이미지 저장 (상품 · 후기 사진) — 서버 디스크(app.upload.dir, 운영은 도커 볼륨)에 두고 /uploads/... 로 보여 준다.
  * 파일 이름 · 확장자는 믿지 않는다: 첫 몇 바이트로 진짜 이미지인지 보고, 이름은 무작위로 새로 짓는다.
  */
 @Slf4j
@@ -45,8 +45,13 @@ public class ImageStorage {
 
     public Path root() {return root;}
 
-    /** 저장하고 화면에서 쓸 주소(/uploads/products/202610/...webp)를 돌려준다 */
+    /** 상품 이미지 — 저장하고 화면에서 쓸 주소(/uploads/products/202610/...webp)를 돌려준다 */
     public String store(MultipartFile file) {
+        return store(file, "products");
+    }
+
+    /** folder(products · reviews) 아래 달별 폴더에 저장 — /uploads/{folder}/202610/{uuid}.{ext} */
+    public String store(MultipartFile file, String folder) {
         if (file == null || file.isEmpty() || file.getSize() > MAX_BYTES) {
             throw new BusinessException(ErrorCode.INVALID_FILE);
         }
@@ -57,7 +62,7 @@ public class ImageStorage {
         catch (IOException e) {
             throw new BusinessException(ErrorCode.INVALID_FILE);
         }
-        String relative = "products/" + YearMonth.now(ZoneId.of("Asia/Seoul")).format(MONTH) + "/" + UUID.randomUUID() + "." + ext;
+        String relative = folder + "/" + YearMonth.now(ZoneId.of("Asia/Seoul")).format(MONTH) + "/" + UUID.randomUUID() + "." + ext;
         Path target = root.resolve(relative).normalize();
         try {
             Files.createDirectories(target.getParent());

@@ -30,12 +30,13 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 400 | `INVALID_RESET_TOKEN` | 비밀번호 재설정 링크 만료 · 사용됨 |
 | 400 | `INVALID_FILE` | 이미지가 아니거나 5MB 초과 |
 | 403 | `FORBIDDEN` | 권한 없음 |
-| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` / `INQUIRY_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
+| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` / `INQUIRY_NOT_FOUND` / `REVIEW_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
 | 409 | `DUPLICATE_EMAIL` | 이미 가입된 이메일 |
 | 409 | `OUT_OF_STOCK` | 재고 부족 |
 | 409 | `CART_EMPTY` | 빈 장바구니로 주문 |
 | 409 | `ORDER_NOT_CANCELLABLE` | 취소할 수 없는 주문 상태 |
 | 409 | `INQUIRY_ALREADY_ANSWERED` | 답이 달린 문의 삭제 |
+| 409 | `REVIEW_NOT_WRITABLE` / `REVIEW_ALREADY_WRITTEN` | 후기 — 배송 전 · 남의 상품 / 이미 씀 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 |
 
 ---
@@ -218,6 +219,33 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | `GET /api/inquiries?page=0&size=20` | | 내 문의, 최신순 (`PageResponse`) |
 | `GET /api/inquiries/{id}` | | 남의 문의 · 없음 → `404 INQUIRY_NOT_FOUND` |
 | `DELETE /api/inquiries/{id}` | | 답 전에만 `204`, 답이 달렸으면 `409 INQUIRY_ALREADY_ANSWERED` |
+
+---
+
+## 상품 후기 (V10)
+
+배송 완료(`DELIVERED`)된 내 주문 상품 하나에 후기 하나. 관리자가 숨기면 손님 목록 · 요약에서 빠진다.
+
+```json
+// ReviewResponse
+{ "id": 1, "productId": 1, "productName": "돌돌 제주산 100% NFC 레드비트즙", "optionName": "30포", "rating": 5,
+  "content": "…", "imageUrls": ["/uploads/reviews/202610/{uuid}.png"], "author": "홍*동",
+  "best": false, "hidden": false, "reply": null, "repliedAt": null, "createdAt": "…",
+  "memberId": null, "memberEmail": null }   // 손님 · 회원 화면은 이름 가림 + memberId · memberEmail 비움, 관리자는 그대로
+```
+
+| API | 로그인 | 설명 |
+| --- | --- | --- |
+| `GET /api/products/{id}/reviews?sort=latest&photoOnly=false&page=0&size=10` | 없이 | `sort`: `latest` · `best`(베스트 먼저) · `rating_high` · `rating_low`. `PageResponse<ReviewResponse>` |
+| `GET /api/products/{id}/reviews/summary` | 없이 | `{ "total": 16, "average": 4.7, "counts": [12, 3, 1, 0, 0] }` — counts 는 5점 → 1점 |
+| `POST /api/reviews/images` | 🔒 | `multipart/form-data` 파트 `file` (jpg · png · webp · gif, 5MB) → `201 { "url": "/uploads/reviews/…" }` |
+| `GET /api/reviews/writable` | 🔒 | 쓸 수 있는 주문 상품 `[{ "orderItemId", "orderNumber", "productId", "productName", "optionName", "deliveredAt" }]` |
+| `POST /api/reviews` | 🔒 | `{ "orderItemId": 47, "rating": 1~5, "content": "10~1,000자", "imageUrls": ["올린 주소", 최대 3장] }` → `201` |
+| `GET /api/reviews/mine?page=0` | 🔒 | 내 후기 (숨김 포함) |
+| `DELETE /api/reviews/{id}` | 🔒 | 내 후기 삭제 → `204`. 지우면 그 상품에 다시 쓸 수 있다 |
+
+- 배송 전 · 남의 주문 상품 → `409 REVIEW_NOT_WRITABLE`, 이미 쓴 상품 → `409 REVIEW_ALREADY_WRITTEN`
+- `imageUrls` 는 `/uploads/reviews/` 로 올린 주소만 (`400`)
 
 ---
 
@@ -613,6 +641,13 @@ BE 가 할 일:
 | `GET /api/admin/inquiries/{id}` | |
 | `PUT /api/admin/inquiries/{id}/answer` | `{ "answer": "5,000자 이하" }` → 답하기 · 고치기. 알림 메일은 처음 답할 때만 |
 
+### 후기관리 (V10)
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/reviews?filter=ALL&page=0&size=20` | `filter`: `ALL` · `HIDDEN` · `BEST` · `NO_REPLY`. 최신순, 작성자 이름 · 이메일 그대로 |
+| `PATCH /api/admin/reviews/{id}` | `{ "hidden": true, "best": true, "reply": "1,000자" }` — 보낸 것만 바꾼다. `reply: ""` 이면 답글 삭제 |
+
 ### 첫 관리자
 
 서버를 켤 때 `INITIAL_ADMIN_EMAILS`(쉼표로 여러 개)에 적힌 **이미 가입한** 회원을 관리자로 바꾼다. 가입 → `.env` 에 적기 → 재시작.
@@ -649,4 +684,4 @@ BE 가 할 일:
 
 ## 나중에 추가
 
-- 엑셀 내보내기, 리뷰, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급
+- 엑셀 내보내기, 할인코드, 취소 · 반품 · 교환, 정기구독, 회원 등급

@@ -46,3 +46,6 @@ out/
 # 운영 서버에서 생기는 것 (인증서 · DB 백업)
 deploy/certbot/
 deploy/backups/
+
+# 로컬에서 올린 상품 · 후기 이미지 (운영은 도커 볼륨)
+uploads/
