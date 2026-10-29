@@ -75,6 +75,11 @@ app:
     # 기본 배송비, 상품 금액이 free-threshold 이상이면 무료. 제주 · 도서 추가 배송비는 관리자 화면(배송 지역)에서
     base-fee: ${SHIPPING_BASE_FEE:3000}
     free-threshold: ${SHIPPING_FREE_THRESHOLD:50000}
+  claim:
+    # 반품 · 교환은 배송 완료 후 이 기간 안에만 (전자상거래법 청약철회 7일)
+    return-days: ${CLAIM_RETURN_DAYS:7}
+    # 단순 변심 반품일 때 환불에서 빼는 왕복 배송비. 불량 · 오배송은 0
+    return-shipping-fee: ${CLAIM_RETURN_SHIPPING_FEE:6000}
   payment:
     # nicepay: 나이스페이 START 직접 연동 / portone: 포트원 경유(정산 때 나이스페이먼츠로 갈아탈 때)
     provider: ${PAYMENT_PROVIDER:nicepay}

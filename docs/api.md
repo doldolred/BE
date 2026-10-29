@@ -30,7 +30,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 400 | `INVALID_RESET_TOKEN` | 비밀번호 재설정 링크 만료 · 사용됨 |
 | 400 | `INVALID_FILE` | 이미지가 아니거나 5MB 초과 |
 | 403 | `FORBIDDEN` | 권한 없음 |
-| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` / `INQUIRY_NOT_FOUND` / `REVIEW_NOT_FOUND` / `COUPON_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
+| 404 | `MEMBER_NOT_FOUND` / `PRODUCT_NOT_FOUND` / `CART_ITEM_NOT_FOUND` / `ORDER_NOT_FOUND` / `NOTICE_NOT_FOUND` / `BANNER_NOT_FOUND` / `INQUIRY_NOT_FOUND` / `REVIEW_NOT_FOUND` / `COUPON_NOT_FOUND` / `CLAIM_NOT_FOUND` | 대상 없음 (공지는 비공개도) |
 | 409 | `DUPLICATE_EMAIL` | 이미 가입된 이메일 |
 | 409 | `OUT_OF_STOCK` | 재고 부족 |
 | 409 | `CART_EMPTY` | 빈 장바구니로 주문 |
@@ -38,6 +38,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | 409 | `INQUIRY_ALREADY_ANSWERED` | 답이 달린 문의 삭제 |
 | 409 | `REVIEW_NOT_WRITABLE` / `REVIEW_ALREADY_WRITTEN` | 후기 — 배송 전 · 남의 상품 / 이미 씀 |
 | 409 | `COUPON_NOT_USABLE` / `COUPON_IN_USE` / `DUPLICATE_COUPON_CODE` | 할인코드 — 쓸 수 없음(이유는 message) / 쓴 코드 삭제 / 코드 중복 |
+| 409 | `CLAIM_NOT_ALLOWED` / `CLAIM_IN_PROGRESS` / `INVALID_CLAIM_STATUS` | 취소 · 반품 · 교환 — 조건 안 맞음 / 처리 중 신청 있음 / 지금 상태에서 못 함 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 |
 
 ---
@@ -269,6 +270,42 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 
 ---
 
+## 🔒 취소 · 반품 · 교환 (V12)
+
+주문 전체 단위. 한 주문에 처리 중(`REQUESTED` · `APPROVED`)인 신청은 하나만 → 또 신청하면 `409 CLAIM_IN_PROGRESS`.
+결제 대기 · 결제 완료 주문은 신청 없이 `POST /api/orders/{orderNumber}/cancel` 로 바로 취소.
+
+| type | 언제 | 처리 |
+| --- | --- | --- |
+| `CANCEL` 취소 요청 | 상품 준비중(`PREPARING`) | 관리자 승인 = 바로 완료: 주문 취소 + 전액 환불 + 재고 · 할인코드 되돌림 |
+| `RETURN` 반품 | 배송 완료 후 7일 안 (`app.claim.return-days`) | 승인(회수) → 완료: 환불 + 주문 `RETURNED`. 단순 변심이면 왕복 배송비 6,000원(`app.claim.return-shipping-fee`) 빼고 **부분 환불**. 식품이라 재고는 안 되돌린다 |
+| `EXCHANGE` 교환 | 배송 완료 후 7일 안, 불량 · 오배송만 | 승인(회수) → 완료: 재발송 택배사 · 송장. 주문은 `DELIVERED` 그대로 |
+
+- `reason`: `CHANGE_OF_MIND`(단순 변심) · `DEFECTIVE`(불량 · 파손) · `WRONG_ITEM`(오배송) · `DELAYED`(배송 지연) · `OTHER`. 불량 · 오배송은 반품 배송비 없음
+- `status`: `REQUESTED`(접수) → `APPROVED`(승인) → `COMPLETED`(완료), 또는 `REJECTED`(거절, `rejectReason`) · `WITHDRAWN`(고객 철회)
+- 승인 · 거절 · 완료 때 고객에게 알림 메일. 조건이 안 맞으면 `409 CLAIM_NOT_ALLOWED` (이유는 `message`)
+- 주문 상태 `RETURNED`(반품 완료) 추가 — 관리자가 직접 바꿀 수 없고 반품 신청 완료로만 간다
+- 결제(`payment`)에 `cancelledAmount`(환불한 금액), 상태 `PARTIAL_CANCELLED`(일부 환불) 추가
+
+```json
+// ClaimResponse
+{ "id": 2, "orderNumber": "20261028-394097", "orderStatus": "DELIVERED", "orderTotalPrice": 41000, "type": "RETURN",
+  "reason": "CHANGE_OF_MIND", "detail": "…", "imageUrls": [], "status": "REQUESTED", "returnShippingFee": 6000,
+  "refundAmount": 35000, "rejectReason": null, "exchangeCourier": null, "exchangeTrackingNumber": null,
+  "approvedAt": null, "completedAt": null, "createdAt": "…", "memberId": null, "memberName": null, "memberEmail": null }
+```
+
+| API | 설명 |
+| --- | --- |
+| `POST /api/orders/{orderNumber}/claims` | `{ "type", "reason", "detail": "2,000자", "imageUrls": [최대 3장] }` → `201` |
+| `GET /api/orders/{orderNumber}/claims` | 이 주문의 신청들 (최신순) |
+| `POST /api/claims/images` | `multipart/form-data` 파트 `file` → `201 { "url": "/uploads/claims/…" }` |
+| `GET /api/claims?page=0` | 내 신청 (최신순) |
+| `GET /api/claims/{id}` | |
+| `POST /api/claims/{id}/withdraw` | 접수 상태에서만 철회 (아니면 `409 INVALID_CLAIM_STATUS`) |
+
+---
+
 ## 🔒 장바구니
 
 장바구니를 바꾸는 API는 모두 **장바구니 전체**(`CartResponse`)를 돌려줍니다.
@@ -322,6 +359,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 | `SHIPPING` | 배송중 |
 | `DELIVERED` | 배송 완료 |
 | `CANCELLED` | 취소 |
+| `RETURNED` | 반품 완료 (V12 — 반품 신청 완료로만) |
 
 ### `POST /api/orders` 주문하기
 
@@ -684,6 +722,17 @@ BE 가 할 일:
 ```
 - `discountType`: `AMOUNT`(원) · `PERCENT`(% , 1~90, `maxDiscount` 로 상한 — 비우면 상한 없음)
 - `code`: 영문 · 숫자 · `-` · `_` 3~30자. `usageLimit` 비우면 무제한
+
+### 취소 · 반품 · 교환 (V12)
+
+| API | 설명 |
+| --- | --- |
+| `GET /api/admin/claims?status=REQUESTED&type=RETURN&page=0` | 둘 다 빼면 전부. 회원 이름 · 이메일 포함 |
+| `GET /api/admin/claims/requested-count` | `{ "count": 2 }` — 메뉴의 접수 수 |
+| `GET /api/admin/claims/{id}` | |
+| `POST /api/admin/claims/{id}/approve` | 취소 요청은 바로 취소 · 환불까지 끝, 반품 · 교환은 `APPROVED` |
+| `POST /api/admin/claims/{id}/reject` | `{ "reason": "500자" }` — 접수 · 승인 상태에서 |
+| `POST /api/admin/claims/{id}/complete` | 반품: 본문 없이 → 환불 + `RETURNED`. 교환: `{ "courier", "trackingNumber" }` 필수 |
 
 ### 첫 관리자
 

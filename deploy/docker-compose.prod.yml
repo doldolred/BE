@@ -76,6 +76,9 @@ services:
       UPLOAD_DIR: /app/uploads
       SHIPPING_BASE_FEE: ${SHIPPING_BASE_FEE:-3000}
       SHIPPING_FREE_THRESHOLD: ${SHIPPING_FREE_THRESHOLD:-50000}
+      # 반품 · 교환 신청 기간(일), 단순 변심 반품 왕복 배송비
+      CLAIM_RETURN_DAYS: ${CLAIM_RETURN_DAYS:-7}
+      CLAIM_RETURN_SHIPPING_FEE: ${CLAIM_RETURN_SHIPPING_FEE:-6000}
     volumes:
       # 관리자가 올린 상품 이미지 — 컨테이너를 새로 띄워도 남는다 (매일 백업에도 포함)
       - uploads:/app/uploads

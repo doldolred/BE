@@ -140,13 +140,30 @@ public class PaymentService {
 	 * 환불이 실패하면 예외가 나서 주문 취소도 함께 롤백된다. 결제 기록이 없으면(결제 전) 아무것도 안 한다.
 	 */
 	public void refund(Order order, String reason) {
+		refund(order, reason, Integer.MAX_VALUE);
+	}
+
+	/**
+	 * amount 만큼 환불 (V12, 반품 배송비를 뺀 반품 환불). 결제 금액 이상이면 전액, 0 이면 아무것도 안 한다.
+	 * 부르는 쪽 트랜잭션 안에서 쓴다 — 실패하면 예외로 함께 롤백.
+	 */
+	public void refund(Order order, String reason, int amount) {
+		if (amount <= 0) {
+			return;
+		}
 		order.getPayments()
 			.stream()
 			.filter(p -> p.getStatus() == PaymentStatus.PAID)
 			.findFirst()
 			.ifPresent(p -> {
-				nicepayClient.cancel(p.getPaymentKey(), order.getOrderNumber(), reason);
-				p.cancel();
+				if (amount >= p.getAmount()) {
+					nicepayClient.cancel(p.getPaymentKey(), order.getOrderNumber(), reason);
+					p.cancel();
+				}
+				else {
+					nicepayClient.cancel(p.getPaymentKey(), order.getOrderNumber(), reason, amount);
+					p.partialCancel(amount);
+				}
 			});
 	}
 

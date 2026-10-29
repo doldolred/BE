@@ -101,12 +101,23 @@ public class NicepayClient {
 
 	/** 승인된 tid 를 전액 취소(환불). 실패하면 예외 */
 	public void cancel(String tid, String orderId, String reason) {
+		cancel(tid, orderId, reason, null);
+	}
+
+	/** cancelAmt 만큼만 부분 취소 (V12, null 이면 전액). 실패하면 예외 */
+	public void cancel(String tid, String orderId, String reason, Integer cancelAmt) {
+		Map<String, Object> body = new java.util.LinkedHashMap<>();
+		body.put("reason", reason);
+		body.put("orderId", orderId);
+		if (cancelAmt != null) {
+			body.put("cancelAmt", cancelAmt);
+		}
 		Result result;
 		try {
 			result = restClient.post()
 				.uri("/v1/payments/{tid}/cancel", tid)
 				.contentType(MediaType.APPLICATION_JSON)
-				.body(Map.of("reason", reason, "orderId", orderId))
+				.body(body)
 				.retrieve()
 				.body(Result.class);
 		}

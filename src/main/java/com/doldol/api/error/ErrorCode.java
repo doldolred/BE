@@ -32,6 +32,7 @@ public enum ErrorCode {
     INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "문의를 찾을 수 없습니다."),
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "후기를 찾을 수 없습니다."),
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "없는 할인코드예요."),
+    CLAIM_NOT_FOUND(HttpStatus.NOT_FOUND, "취소 · 반품 · 교환 신청을 찾을 수 없습니다."),
 
     // 409
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
@@ -49,6 +50,9 @@ public enum ErrorCode {
     COUPON_NOT_USABLE(HttpStatus.CONFLICT, "사용할 수 없는 할인코드예요."),
     COUPON_IN_USE(HttpStatus.CONFLICT, "사용된 할인코드는 지울 수 없어요. 끄기만 할 수 있어요."),
     DUPLICATE_COUPON_CODE(HttpStatus.CONFLICT, "이미 있는 할인코드예요."),
+    CLAIM_NOT_ALLOWED(HttpStatus.CONFLICT, "지금은 신청할 수 없는 주문이에요."),
+    CLAIM_IN_PROGRESS(HttpStatus.CONFLICT, "이미 처리 중인 신청이 있어요."),
+    INVALID_CLAIM_STATUS(HttpStatus.CONFLICT, "지금 상태에서는 할 수 없어요."),
 
     // 400 (관리자)
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "조회 기간을 확인해 주세요. (최대 1년)"),

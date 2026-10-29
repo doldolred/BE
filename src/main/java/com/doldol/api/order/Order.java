@@ -168,10 +168,18 @@ public class Order extends BaseEntity {
         if (next == OrderStatus.SHIPPING) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "배송중으로 바꿀 때는 택배사와 송장번호가 필요합니다.");
         }
+        if (next == OrderStatus.RETURNED) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "반품은 취소 · 반품 · 교환 신청에서 처리해요.");
+        }
         moveTo(next);
         if (next == OrderStatus.DELIVERED) {
             deliveredAt = Instant.now();
         }
+    }
+
+    /** 반품 완료 (V12) — 반품 신청을 처리할 때 ClaimService 가 부른다 */
+    public void markReturned() {
+        moveTo(OrderStatus.RETURNED);
     }
 
     /** 관리자 발송 처리 — 준비중 → 배송중 + 송장 */

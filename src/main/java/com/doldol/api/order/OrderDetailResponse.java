@@ -10,8 +10,8 @@ public record OrderDetailResponse(String orderNumber, OrderStatus status, int it
     public record Item(Long productId, String productName, Long optionId, String optionName, int unitPrice, int quantity, int lineTotal) { static Item from(OrderItem item) {return new Item(item.getProduct().getId(), item.getProductName(), item.getOption().getId(), item.getOptionName(), item.getUnitPrice(), item.getQuantity(), item.getLineTotal());}}
 
     /** 승인된(또는 승인 후 취소된) 결제. 결제 전이면 null */
-    public record PaymentInfo(PaymentProvider provider, PaymentStatus status, String method, int amount, Instant approvedAt, Instant cancelledAt, String receiptUrl) {
-        static PaymentInfo from(Payment p) {return new PaymentInfo(p.getProvider(), p.getStatus(), p.getMethod(), p.getAmount(), p.getApprovedAt(), p.getCancelledAt(), p.getReceiptUrl());}
+    public record PaymentInfo(PaymentProvider provider, PaymentStatus status, String method, int amount, int cancelledAmount, Instant approvedAt, Instant cancelledAt, String receiptUrl) {
+        static PaymentInfo from(Payment p) {return new PaymentInfo(p.getProvider(), p.getStatus(), p.getMethod(), p.getAmount(), p.getCancelledAmount(), p.getApprovedAt(), p.getCancelledAt(), p.getReceiptUrl());}
     }
 
     public static OrderDetailResponse from(Order order) {

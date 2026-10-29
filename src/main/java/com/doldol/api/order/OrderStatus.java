@@ -11,7 +11,9 @@ public enum OrderStatus {
     PREPARING,
     SHIPPING,
     DELIVERED,
-    CANCELLED;
+    CANCELLED,
+    /** 반품 완료 (V12) — 반품 신청을 처리할 때만 */
+    RETURNED;
 
     public static final Set<OrderStatus> SALES = Collections.unmodifiableSet(EnumSet.of(PAID, PREPARING, SHIPPING, DELIVERED));
     public boolean isCancellable() {return this == PENDING_PAYMENT || this == PAID;}
@@ -21,7 +23,8 @@ public enum OrderStatus {
             case PAID -> next == PREPARING || next == CANCELLED;
             case PREPARING -> next == SHIPPING || next == CANCELLED;
             case SHIPPING -> next == DELIVERED;
-            case DELIVERED, CANCELLED -> false;
+            case DELIVERED -> next == RETURNED;
+            case CANCELLED, RETURNED -> false;
         };
     }
 

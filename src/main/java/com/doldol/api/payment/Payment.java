@@ -60,6 +60,10 @@ public class Payment extends BaseEntity {
 
 	private Instant cancelledAt;
 
+	/** 환불한 금액 (V12) — 전액 취소면 amount 와 같다 */
+	@Column(nullable = false)
+	private int cancelledAmount;
+
 	/** 나이스페이가 승인한 결제 */
 	public static Payment paid(Order order, NicepayClient.Approval approval) {
 		Payment payment = new Payment();
@@ -88,6 +92,14 @@ public class Payment extends BaseEntity {
 
 	public void cancel() {
 		status = PaymentStatus.CANCELLED;
+		cancelledAmount = amount;
+		cancelledAt = Instant.now();
+	}
+
+	/** 일부만 환불 (V12) */
+	public void partialCancel(int refundAmount) {
+		status = PaymentStatus.PARTIAL_CANCELLED;
+		cancelledAmount = refundAmount;
 		cancelledAt = Instant.now();
 	}
 
