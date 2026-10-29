@@ -13,11 +13,12 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class ProductService {
     private final ProductRepository productRepository;
+    /** 판매중 + 출시 예정, 라인업 순서대로 (비공개는 빼고) */
     public List<ProductResponse> getProducts(){
-        return productRepository.findAllByActiveTrueOrderByIdAsc().stream().map(ProductResponse::from).toList();
+        return productRepository.findAllByStatusInOrderByLineupOrderAscIdAsc(ProductStatus.PUBLIC).stream().map(ProductResponse::from).toList();
     }
     public ProductResponse getProduct(Long id){
-        Product product = productRepository.findById(id).filter(Product::isActive).orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        Product product = productRepository.findById(id).filter(p -> p.getStatus().isPublic()).orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
         return ProductResponse.from(product);
     }
 }

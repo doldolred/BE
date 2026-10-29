@@ -21,7 +21,7 @@ public class AdminProductController {
     public AdminProductResponse create(@Valid @RequestBody AdminProductRequest request){return adminProductService.create(request);}
     @PutMapping("/{id}")
     public AdminProductResponse update(@PathVariable Long id, @Valid @RequestBody AdminProductRequest request){return adminProductService.update(id, request);}
-    @PatchMapping("/{id}/active")
-    public AdminProductResponse changeActive(@PathVariable Long id, @Valid @RequestBody ChangeActiveRequest request){return adminProductService.changeActive(id, request.active());
+    @PatchMapping("/{id}/status")
+    public AdminProductResponse changeStatus(@PathVariable Long id, @Valid @RequestBody ChangeStatusRequest request){return adminProductService.changeStatus(id, request.status());
     }
 }

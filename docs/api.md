@@ -124,7 +124,7 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 
 가격 · 재고는 **옵션**(10포 · 30포 · 60포)마다 있다. 장바구니 · 주문은 옵션을 담는다 (V5).
 
-### `GET /api/products` 상품 목록 (판매중만)
+### `GET /api/products` 상품 목록 (판매중 + 출시 예정, 라인업 순서)
 
 `200 OK`
 ```json
@@ -134,20 +134,29 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
     "name": "돌돌 제주산 100% NFC 레드비트즙",
     "description": "...",
     "imageUrl": "/uploads/products/202610/….webp",
+    "status": "SELLING",
     "minPrice": 38000,
     "soldOut": false,
     "options": [
       { "id": 1, "name": "10포", "listPrice": 16000, "price": 13900, "discountRate": 13, "stock": 0, "soldOut": true },
       { "id": 2, "name": "30포", "listPrice": 48000, "price": 38000, "discountRate": 20, "stock": 100, "soldOut": false },
       { "id": 3, "name": "60포", "listPrice": 96000, "price": 75000, "discountRate": 21, "stock": 50, "soldOut": false }
-    ]
-  }
+    ],
+    "enName": "RED BEET", "spec": "120ml × 30포 / 60포", "points": ["비트 100%", "물 0% · 설탕 0%", "120ml 한 포"],
+    "theme": "NAVY", "art": "POUCH", "artFrontUrl": null, "artBackUrl": null
+  },
+  { "id": 8, "name": "돌돌 비트 농축액", "status": "COMING_SOON", "minPrice": 0, "soldOut": true, "options": [],
+    "enName": "BEET EXTRACT", "spec": "500ml", "points": ["…"], "theme": "PINK", "art": "BOTTLE", "…": "…" }
 ]
 ```
 
 - `options` 는 판매중인 옵션만, 정한 순서대로. `listPrice` 정상가 · `price` 판매가 · `discountRate` 할인율(%, 내림)
 - `minPrice`: 품절 아닌 옵션 중 최저가 (다 품절이면 전체 중) — 목록에 "38,000원~"
 - 상품 이미지는 `/uploads/…` (같은 도메인, 오래 캐시)
+- `status`: `SELLING` 판매중 · `COMING_SOON` 출시 예정(옵션을 보내지 않음, 담기 불가). 비공개(`HIDDEN`)는 목록에 없고 상세 404
+- 라인업 연출 (V13): `enName` 무대 뒤 영문 · `spec` 구성 · `points` 스티커 문구 · `theme` 색(`NAVY` · `PINK` · `LIME`) ·
+  `art` 그림(`POUCH` 3D 파우치 · `BOTTLE` · `JAR`) · `artFrontUrl` / `artBackUrl` 파우치 도안 앞 · 뒤(없으면 기본 그림).
+  맨 앞 판매중 상품이 메인 라인업 가운데
 
 ### `GET /api/products/{id}` 상품 상세
 
@@ -618,27 +627,22 @@ BE 가 할 일:
 
 | API | 설명 |
 | --- | --- |
-| `GET /api/admin/products` | 판매 중지 포함 전체, 최근 등록순 |
+| `GET /api/admin/products` | 비공개 포함 전체, 라인업 순서 |
 | `GET /api/admin/products/{id}` | 상세 |
 | `POST /api/admin/products` | 등록 → `201` |
 | `PUT /api/admin/products/{id}` | 수정 (전체 값) |
-| `PATCH /api/admin/products/{id}/active` `{ "active": false }` | 판매 중지 / 재개 |
+| `PATCH /api/admin/products/{id}/status` `{ "status": "HIDDEN" }` | 판매중 · 출시 예정 · 비공개 바꾸기 (V13) |
 
-```json
-// 등록 · 수정 요청
-{ "name": "돌돌 비트 농축액", "description": "...", "price": 29000, "stock": 50, "imageUrl": "https://...", "active": true }
-// 응답
-{ "id": 2, "name": "...", "description": "...", "price": 29000, "stock": 50, "imageUrl": "https://...",
-  "active": true, "createdAt": "...", "updatedAt": "..." }
-```
-
-상품은 지우지 않는다 — 지난 주문이 참조하고 있어서 **판매 중지**로 숨긴다. 판매 중지 상품은 고객 목록 · 상세에서 안 보인다(404). 가격을 바꿔도 지난 주문의 금액은 그대로.
+상품은 지우지 않는다 — 지난 주문이 참조하고 있어서 **비공개**로 숨긴다. 비공개 상품은 고객 목록 · 상세에서 안 보인다(404). 가격을 바꿔도 지난 주문의 금액은 그대로.
+판매중(`SELLING`)이면 판매할 옵션이 하나 이상 있어야 한다 — 없으면 `400 INVALID_INPUT`. 출시 예정 · 비공개는 옵션 없이도 된다.
 
 #### 상품 요청 본문 (V5 — 옵션)
 
 ```json
 {
-  "name": "돌돌 제주산 100% NFC 레드비트즙", "description": "…", "imageUrl": "/uploads/…", "active": true,
+  "name": "돌돌 제주산 100% NFC 레드비트즙", "description": "…", "imageUrl": "/uploads/…", "status": "SELLING",
+  "enName": "RED BEET", "spec": "120ml × 30포 / 60포", "points": ["비트 100%", "물 0% · 설탕 0%", "120ml 한 포"],
+  "theme": "NAVY", "art": "POUCH", "artFrontUrl": "/uploads/…/front.png", "artBackUrl": "/uploads/…/back.png", "lineupOrder": 1,
   "options": [
     { "id": 2, "name": "30포", "listPrice": 48000, "price": 38000, "stock": 100, "active": true },
     { "name": "90포", "listPrice": 144000, "price": 110000, "stock": 10, "active": true }
@@ -648,6 +652,7 @@ BE 가 할 일:
 
 - 옵션은 **전부** 보낸다: `id` 가 있으면 수정, 없으면 추가, 목록에서 빠진 기존 옵션은 판매중지(`active=false`, 지난 주문이 가리키므로 지우지 않음). 순서 = 배열 순서
 - 응답 `AdminProductResponse` 의 `options` 에는 판매중지된 옵션도 들어 있다 (`sortOrder` · `active` 포함)
+- 라인업: `theme` · `art` · `lineupOrder`(0~999, 작을수록 앞) 필수. `points` 4개까지 · 각 20자, 빈 줄은 버린다. 빈 문자열은 `null` 로 저장
 
 #### 🔒 `POST /api/admin/uploads` 상품 이미지 올리기
 
