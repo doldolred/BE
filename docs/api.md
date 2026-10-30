@@ -118,6 +118,13 @@ FE(FE 저장소의 `src/api`)와 BE가 공유하는 계약입니다. 바꿀 때�
 
 `{ "agreed": true }` → `MemberResponse`
 
+### 🔒 `POST /api/members/me/withdraw` 회원 탈퇴
+
+`{ "password": "현재 비밀번호" }` → `204 No Content` (로그인 유지 쿠키도 지운다)
+
+- 회원 행은 남기고 이메일 · 이름 · 휴대폰을 지운다 (주문 · 결제 기록은 전자상거래법상 5년 보관). 장바구니 · 로그인 유지 · 비밀번호 재설정 링크는 삭제 (V14 `withdrawn_at`)
+- 비밀번호가 틀리면 `400 PASSWORD_MISMATCH`, 결제 대기 · 결제 완료 · 상품 준비 · 배송중 주문이 있으면 `409 MEMBER_HAS_ACTIVE_ORDERS`
+
 ---
 
 ## 상품

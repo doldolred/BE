@@ -53,6 +53,7 @@ public enum ErrorCode {
     CLAIM_NOT_ALLOWED(HttpStatus.CONFLICT, "지금은 신청할 수 없는 주문이에요."),
     CLAIM_IN_PROGRESS(HttpStatus.CONFLICT, "이미 처리 중인 신청이 있어요."),
     INVALID_CLAIM_STATUS(HttpStatus.CONFLICT, "지금 상태에서는 할 수 없어요."),
+    MEMBER_HAS_ACTIVE_ORDERS(HttpStatus.CONFLICT, "진행 중인 주문이 있어요. 배송이 끝나거나 취소된 뒤에 탈퇴할 수 있어요."),
 
     // 400 (관리자)
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "조회 기간을 확인해 주세요. (최대 1년)"),

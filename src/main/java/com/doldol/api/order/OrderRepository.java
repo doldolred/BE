@@ -2,6 +2,7 @@ package com.doldol.api.order;
 
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -16,6 +17,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @EntityGraph(attributePaths = "items")
     Optional<Order> findByOrderNumberAndMemberId(String orderNumber, Long memberId);
     boolean existsByOrderNumber(String orderNumber);
+    /** 탈퇴 전에 진행 중인 주문이 있는지 */
+    boolean existsByMemberIdAndStatusIn(Long memberId, Collection<OrderStatus> statuses);
 
     @EntityGraph(attributePaths = "items")
     Optional<Order> findByOrderNumber(String orderNumber);

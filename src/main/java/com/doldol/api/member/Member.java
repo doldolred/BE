@@ -39,6 +39,8 @@ public class Member extends BaseEntity{
     private boolean marketingAgreed;
     /** 마케팅 수신에 마지막으로 동의 / 철회한 시각 */
     private Instant marketingAgreedAt;
+    /** 탈퇴 시각 (V14) — 탈퇴하면 이메일 · 이름 · 휴대폰을 지우고 로그인할 수 없게 한다 */
+    private Instant withdrawnAt;
     public static Member create(String email, String encodedPassword, String name, String phone, boolean marketingAgreed){
         Member member = new Member();
         Instant now = Instant.now();
@@ -56,6 +58,16 @@ public class Member extends BaseEntity{
 //관리자 권한 변경
     public void changeRole(Role role){this.role = role;}
     public void changePassword(String encodedPassword){this.password = encodedPassword;}
+    /** 탈퇴 — 주문 기록과의 연결만 남기고 개인정보를 지운다. 이메일은 유일해야 해서 id 로 채운다 */
+    public void withdraw(String encodedRandomPassword){
+        this.email = "withdrawn-" + id + "@doldol.invalid";
+        this.password = encodedRandomPassword;
+        this.name = "탈퇴회원";
+        this.phone = null;
+        this.marketingAgreed = false;
+        this.marketingAgreedAt = Instant.now();
+        this.withdrawnAt = Instant.now();
+    }
     public void changeMarketingAgreed(boolean agreed){
         this.marketingAgreed = agreed;
         this.marketingAgreedAt = Instant.now();
