@@ -12,6 +12,7 @@ import com.doldol.api.order.OrderItem;
 import com.doldol.api.order.OrderRepository;
 import com.doldol.api.order.OrderStatus;
 import com.doldol.api.payment.PaymentService;
+import com.doldol.api.point.PointService;
 import com.doldol.api.product.ProductOptionRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -32,12 +33,13 @@ public class ClaimService {
     private final ProductOptionRepository productOptionRepository;
     private final PaymentService paymentService;
     private final CouponService couponService;
+    private final PointService pointService;
     private final MailService mailService;
     private final Duration returnPeriod;
     private final int returnShippingFee;
     private final String frontendUrl;
     public ClaimService(OrderClaimRepository claimRepository, OrderRepository orderRepository, ProductOptionRepository productOptionRepository,
-                        PaymentService paymentService, CouponService couponService, MailService mailService,
+                        PaymentService paymentService, CouponService couponService, PointService pointService, MailService mailService,
                         @Value("${app.claim.return-days:7}") int returnDays, @Value("${app.claim.return-shipping-fee:6000}") int returnShippingFee,
                         @Value("${app.frontend-url}") String frontendUrl) {
         this.claimRepository = claimRepository;
@@ -45,6 +47,7 @@ public class ClaimService {
         this.productOptionRepository = productOptionRepository;
         this.paymentService = paymentService;
         this.couponService = couponService;
+        this.pointService = pointService;
         this.mailService = mailService;
         this.returnPeriod = Duration.ofDays(returnDays);
         this.returnShippingFee = returnShippingFee;
@@ -67,6 +70,9 @@ public class ClaimService {
                 }
             }
             case RETURN, EXCHANGE -> {
+                if (order.getConfirmedAt() != null) {
+                    throw notAllowed("구매확정한 주문은 반품 · 교환을 신청할 수 없어요. 상품에 문제가 있으면 1:1 문의로 알려 주세요.");
+                }
                 if (order.getStatus() != OrderStatus.DELIVERED || order.getDeliveredAt() == null
                         || Instant.now().isAfter(order.getDeliveredAt().plus(returnPeriod))) {
                     throw notAllowed("배송 완료 후 %d일 안에만 신청할 수 있어요.".formatted(returnPeriod.toDays()));
@@ -131,6 +137,7 @@ public class ClaimService {
                 productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
             }
             couponService.release(order);
+            pointService.release(order, 0);
             notify(claim, "취소가 완료됐어요", "결제하신 금액은 카드사에 따라 3~7일 안에 환불돼요.");
         }
         else {
@@ -158,6 +165,8 @@ public class ClaimService {
                 paymentService.refund(order, "반품 완료", claim.getRefundAmount());
                 order.markReturned();
                 couponService.release(order);
+                // 반품 배송비가 환불 금액보다 크면 그 차액만큼은 돌려줄 적립금에서 뺀다
+                pointService.release(order, Math.max(0, claim.getReturnShippingFee() - order.getTotalPrice()));
                 notify(claim, "반품이 완료됐어요", "%,d원이 카드사에 따라 3~7일 안에 환불돼요.".formatted(claim.getRefundAmount())
                         + (claim.getReturnShippingFee() > 0 ? " (반품 배송비 %,d원 제외)".formatted(claim.getReturnShippingFee()) : ""));
             }

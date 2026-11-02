@@ -50,7 +50,7 @@ public class Order extends BaseEntity {
     @Column(nullable = false, length = 20)
     private OrderStatus status;
 
-    /** 결제 금액 = itemsPrice - discountAmount + shippingFee */
+    /** 결제 금액 = itemsPrice - discountAmount - pointsUsed + shippingFee */
     @Column(nullable = false)
     private int totalPrice;
 
@@ -69,6 +69,17 @@ public class Order extends BaseEntity {
     /** 할인 금액 (V11) — 상품 금액에서만 깎는다 */
     @Column(nullable = false)
     private int discountAmount;
+
+    /** 쓴 적립금 (V15) — 할인 뒤 금액에서 깎는다 */
+    @Column(nullable = false)
+    private int pointsUsed;
+
+    /** 구매확정 때 적립된 금액 (V15) */
+    @Column(nullable = false)
+    private int pointsEarned;
+
+    /** 구매확정한 때 (V15) — 확정 후에는 반품 · 교환 신청을 받지 않는다 */
+    private Instant confirmedAt;
 
     @Column(nullable = false, length = 50)
     private String receiverName;
@@ -140,8 +151,14 @@ public class Order extends BaseEntity {
         recalculate();
     }
 
+    /** 적립금 사용 (V15) — 잔액 · 한도 검사는 PointService 가 한다 */
+    public void applyPoints(int points) {
+        this.pointsUsed = points;
+        recalculate();
+    }
+
     private void recalculate() {
-        totalPrice = itemsPrice - discountAmount + shippingFee;
+        totalPrice = itemsPrice - discountAmount - pointsUsed + shippingFee;
     }
 
     /** 결제 승인 반영 — 결제대기 → 결제완료 */
@@ -180,6 +197,20 @@ public class Order extends BaseEntity {
     /** 반품 완료 (V12) — 반품 신청을 처리할 때 ClaimService 가 부른다 */
     public void markReturned() {
         moveTo(OrderStatus.RETURNED);
+    }
+
+    /** 구매확정할 수 있는가 (V15) — 배송 완료 + 아직 확정 전 */
+    public boolean isConfirmable() {
+        return status == OrderStatus.DELIVERED && confirmedAt == null;
+    }
+
+    /** 구매확정 (V15) — 적립 금액은 PointService 가 계산 */
+    public void confirm(int earned) {
+        if (!isConfirmable()) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_CONFIRMABLE);
+        }
+        this.confirmedAt = Instant.now();
+        this.pointsEarned = earned;
     }
 
     /** 관리자 발송 처리 — 준비중 → 배송중 + 송장 */

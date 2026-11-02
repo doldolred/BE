@@ -7,6 +7,7 @@ import com.doldol.api.order.Order;
 import com.doldol.api.order.OrderItem;
 import com.doldol.api.order.OrderRepository;
 import com.doldol.api.order.OrderStatus;
+import com.doldol.api.point.PointService;
 import com.doldol.api.product.ProductOptionRepository;
 import java.time.Instant;
 import java.util.List;
@@ -42,6 +43,8 @@ public class PaymentService {
 	private final TransactionTemplate tx;
 
 	private final CouponService couponService;
+
+	private final PointService pointService;
 
 	// ───────── 결제 승인 ─────────
 
@@ -200,6 +203,7 @@ public class PaymentService {
 			productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
 		}
 		couponService.release(order); // 결제 안 한 주문에 쓴 할인코드는 되돌린다
+		pointService.release(order, 0); // 쓴 적립금도 돌려준다
 	}
 
 	// ───────── 도우미 ─────────

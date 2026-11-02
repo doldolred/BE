@@ -2,6 +2,7 @@ package com.doldol.api.order;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 public record CreateOrderRequest(
@@ -24,4 +25,7 @@ public record CreateOrderRequest(
         String memo,
         // 선택 — 할인코드 (V11)
         @Size(max = 30, message = "할인코드가 너무 깁니다.")
-        String couponCode) {}
+        String couponCode,
+        // 선택 — 쓸 적립금 (V15). 잔액 · 한도는 서버가 다시 확인
+        @PositiveOrZero(message = "적립금은 0원 이상이어야 해요.")
+        Integer points) {}

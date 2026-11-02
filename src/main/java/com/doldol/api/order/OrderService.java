@@ -8,6 +8,7 @@ import com.doldol.api.error.ErrorCode;
 import com.doldol.api.member.Member;
 import com.doldol.api.member.MemberRepository;
 import com.doldol.api.payment.PaymentService;
+import com.doldol.api.point.PointService;
 import com.doldol.api.product.ProductOption;
 import com.doldol.api.product.ProductOptionRepository;
 import com.doldol.api.shipping.ShippingPolicy;
@@ -33,6 +34,7 @@ public class OrderService {
     private final PaymentService paymentService;
     private final ShippingPolicy shippingPolicy;
     private final CouponService couponService;
+    private final PointService pointService;
 
     @Transactional
     public OrderDetailResponse createOrder(Long memberId, CreateOrderRequest request) {
@@ -55,6 +57,10 @@ public class OrderService {
             couponService.apply(order, member, request.couponCode());
         }
         order.applyShippingFee(shippingPolicy.quote(order.getItemsPrice(), order.getZipcode()).fee());
+        // 적립금 (V15) — 배송비까지 정해진 뒤에 깎는다
+        if (request.points() != null && request.points() > 0) {
+            pointService.use(order, member, request.points());
+        }
         cartItemRepository.deleteAllByMemberId(memberId);
         return OrderDetailResponse.from(order);
     }
@@ -70,6 +76,7 @@ public class OrderService {
         order.cancel();
         paymentService.refund(order, "고객 요청 취소"); // 결제된 주문이면 환불 — 실패하면 취소도 롤백
         couponService.release(order); // 쓴 할인코드는 다시 쓸 수 있게
+        pointService.release(order, 0); // 쓴 적립금은 돌려준다
         for (OrderItem item : order.getItems()) {productOptionRepository.increaseStock(item.getOption().getId(), item.getQuantity());
         }return OrderDetailResponse.from(order);
     }
