@@ -1,6 +1,7 @@
 package com.doldol.api.order;
 
 import com.doldol.api.claim.ClaimStatus;
+import com.doldol.api.claim.ClaimType;
 import com.doldol.api.claim.OrderClaimRepository;
 import com.doldol.api.error.BusinessException;
 import com.doldol.api.error.ErrorCode;
@@ -48,7 +49,7 @@ public class PurchaseConfirmService {
     @Scheduled(cron = "${app.point.confirm-cron:0 0 * * * *}", zone = "Asia/Seoul")
     public void autoConfirm() {
         Instant before = Instant.now().minus(returnPeriod);
-        List<String> orderNumbers = tx.execute(s -> orderRepository.findConfirmTargets(OrderStatus.DELIVERED, before, ClaimStatus.OPEN));
+        List<String> orderNumbers = tx.execute(s -> orderRepository.findConfirmTargets(OrderStatus.DELIVERED, before, ClaimStatus.OPEN, ClaimType.EXCHANGE));
         if (orderNumbers == null || orderNumbers.isEmpty()) {
             return;
         }

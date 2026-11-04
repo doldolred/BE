@@ -1,6 +1,7 @@
 package com.doldol.api.order;
 
 import com.doldol.api.claim.ClaimStatus;
+import com.doldol.api.claim.ClaimType;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -33,12 +34,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select o.orderNumber from Order o where o.status = :status and o.createdAt < :before")
     List<String> findOrderNumbersByStatusBefore(@Param("status") OrderStatus status, @Param("before") Instant before);
 
-    /** 자동 구매확정 대상 (V15) — 배송 완료 후 before 가 지났고, 확정 전이며, 진행 중인 신청이 없는 주문 */
+    /**
+     * 자동 구매확정 대상 (V15) — 배송 완료 후 before 가 지났고, 확정 전이며, 진행 중인 신청이 없는 주문.
+     * 교환품을 보낸 주문은 보낸 때(교환 완료)부터 다시 기간을 센다 — 교환품을 받기 전에 확정되지 않게
+     */
     @Query("""
             select o.orderNumber from Order o
             where o.status = :status and o.confirmedAt is null and o.deliveredAt < :before
-              and not exists (select c.id from OrderClaim c where c.order = o and c.status in :open)
+              and not exists (select c.id from OrderClaim c where c.order = o
+                              and (c.status in :open or (c.type = :exchange and c.completedAt >= :before)))
             """)
     List<String> findConfirmTargets(@Param("status") OrderStatus status, @Param("before") Instant before,
-                                    @Param("open") Collection<ClaimStatus> open);
+                                    @Param("open") Collection<ClaimStatus> open, @Param("exchange") ClaimType exchange);
 }
