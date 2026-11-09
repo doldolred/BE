@@ -88,6 +88,22 @@ app:
     min-payment: ${POINT_MIN_PAYMENT:1000}
     # 적립 후 유효기간 (일)
     valid-days: ${POINT_VALID_DAYS:365}
+  oauth:
+    # 카카오 · 네이버 로그인. client-id 가 비어 있으면 그 로그인 버튼은 안 보인다
+    # 콜백 주소(각 개발자 센터에 등록): {frontend-url}/oauth/kakao/callback · {frontend-url}/oauth/naver/callback
+    frontend-url: ${app.frontend-url}
+    kakao:
+      # 카카오 developers > 앱 키 > REST API 키. client-secret 은 보안 > Client Secret 을 켰을 때만
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      auth-url: ${KAKAO_AUTH_URL:https://kauth.kakao.com}
+      api-url: ${KAKAO_API_URL:https://kapi.kakao.com}
+    naver:
+      # 네이버 developers > 애플리케이션 > Client ID · Client Secret
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      auth-url: ${NAVER_AUTH_URL:https://nid.naver.com}
+      api-url: ${NAVER_API_URL:https://openapi.naver.com}
   payment:
     # nicepay: 나이스페이 START 직접 연동 / portone: 포트원 경유(정산 때 나이스페이먼츠로 갈아탈 때)
     provider: ${PAYMENT_PROVIDER:nicepay}

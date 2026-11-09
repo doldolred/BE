@@ -3,6 +3,8 @@ package com.doldol.api.member;
 import com.doldol.api.security.LoginMember;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,12 @@ public class MemberController {
         return memberService.getMe(loginMember.id());
     }
 
+    /** 회원정보 수정 — 이름 · 휴대폰 */
+    @PatchMapping("/me")
+    public MemberResponse updateProfile(@AuthenticationPrincipal LoginMember loginMember, @Valid @RequestBody UpdateProfileRequest request) {
+        return memberService.updateProfile(loginMember.id(), request.name(), request.phone());
+    }
+
     /** 비밀번호 변경 — 다른 기기는 로그아웃되고, 지금 기기에는 새 토큰을 준다 */
     @PatchMapping("/me/password")
     public ResponseEntity<LoginResponse> changePassword(@AuthenticationPrincipal LoginMember loginMember, @Valid @RequestBody ChangePasswordRequest request) {
@@ -47,6 +55,12 @@ public class MemberController {
         return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, authCookies.clear().toString()).build();
     }
 
-    public record WithdrawRequest(@NotBlank String password) {}
+    /** 소셜로만 가입해 비밀번호가 없으면 비워도 된다 (서버가 확인) */
+    public record WithdrawRequest(String password) {}
+
+    public record UpdateProfileRequest(
+            @NotBlank(message = "이름을 입력해 주세요.") @Size(max = 50, message = "이름은 50자 이하로 입력해 주세요.") String name,
+            /** 선택 — 비우면 지운다 */
+            @Pattern(regexp = "^$|^01[0-9]-?\\d{3,4}-?\\d{4}$", message = "휴대폰 번호 형식이 아닙니다.") String phone) {}
 
 }

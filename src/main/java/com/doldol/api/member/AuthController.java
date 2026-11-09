@@ -1,6 +1,10 @@
 package com.doldol.api.member;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -42,6 +46,15 @@ public class AuthController {
     @PostMapping("/password/reset")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {passwordResetService.reset(request.token(), request.newPassword());}
+
+    /** 아이디(이메일) 찾기 — 이름 + 휴대폰. 이메일은 가려서 */
+    @PostMapping("/email/find")
+    public List<AuthService.FoundEmail> findEmail(@Valid @RequestBody FindEmailRequest request) {return authService.findEmails(request.name(), request.phone());}
+
+    public record FindEmailRequest(
+            @NotBlank(message = "이름을 입력해 주세요.") @Size(max = 50) String name,
+            @NotBlank(message = "휴대폰 번호를 입력해 주세요.")
+            @Pattern(regexp = "^01[0-9]-?\\d{3,4}-?\\d{4}$", message = "휴대폰 번호 형식이 아닙니다.") String phone) {}
 
     private ResponseEntity<LoginResponse> withCookie(AuthService.LoginResult result) {
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, authCookies.issue(result.refreshToken()).toString()).body(result.body());

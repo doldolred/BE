@@ -1,5 +1,6 @@
 package com.doldol.api.config;
 
+import com.doldol.api.oauth.OAuthProperties;
 import com.doldol.api.security.JwtAuthenticationFilter;
 import com.doldol.api.security.JwtProperties;
 import com.doldol.api.security.JwtTokenProvider;
@@ -23,7 +24,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, OAuthProperties.class})
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -49,8 +50,8 @@ public class SecurityConfig {
 						.requestMatchers("/error").permitAll()
 						.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
-								"/api/auth/password/forgot", "/api/auth/password/reset").permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/products/**", "/api/shipping/**", "/api/notices/**", "/api/banners/**", "/uploads/**").permitAll()
+								"/api/auth/password/forgot", "/api/auth/password/reset", "/api/auth/email/find", "/api/auth/oauth/**").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/auth/oauth/providers", "/api/products/**", "/api/shipping/**", "/api/notices/**", "/api/banners/**", "/uploads/**").permitAll()
 						// 나이스페이 결제 결과 (브라우저 form POST) — 로그인 대신 서명으로 검증한다
 						.requestMatchers(HttpMethod.POST, "/api/payments/nicepay/return").permitAll()
 						.requestMatchers("/api/admin/**").hasRole("ADMIN")

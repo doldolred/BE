@@ -3,6 +3,8 @@ package com.doldol.api.member;
 import com.doldol.api.error.BusinessException;
 import com.doldol.api.error.ErrorCode;
 import com.doldol.api.security.JwtTokenProvider;
+import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -52,16 +54,35 @@ public class AuthService {
     @Transactional
     public LoginResult changePassword(Long memberId, ChangePasswordRequest request) {
         Member member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-        if (!passwordEncoder.matches(request.currentPassword(), member.getPassword())) {
+        // 소셜로만 가입해 비밀번호를 정한 적이 없으면 현재 비밀번호를 묻지 않는다 (V17)
+        if (member.isPasswordSet() && (request.currentPassword() == null || !passwordEncoder.matches(request.currentPassword(), member.getPassword()))) {
             throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
         member.changePassword(passwordEncoder.encode(request.newPassword()));
         refreshTokenService.revokeAll(memberId);
         return issue(member);
     }
-    private LoginResult issue(Member member) {
+    /** 로그인 토큰 발급 — 소셜 로그인(OAuthService)도 여기로 */
+    @Transactional
+    public LoginResult issue(Member member) {
         String accessToken = jwtTokenProvider.createAccessToken(member);
         return new LoginResult(LoginResponse.of(accessToken, jwtTokenProvider.getValiditySeconds(), member), refreshTokenService.issue(member));
     }
-    static String normalize(String email){return email.trim().toLowerCase(Locale.ROOT);}
+    /** 아이디(이메일) 찾기 — 이름 + 휴대폰이 맞는 계정의 이메일을 가려서 보여 준다 (없으면 빈 목록) */
+    public List<FoundEmail> findEmails(String name, String phone) {
+        String digits = phone.replaceAll("[^0-9]", "");
+        return memberRepository.findByNameAndPhoneDigits(name.trim(), digits).stream()
+                .map(m -> new FoundEmail(maskEmail(m.getEmail()), m.getCreatedAt()))
+                .toList();
+    }
+    public record FoundEmail(String email, Instant joinedAt) {
+    }
+    /** ab***@gmail.com — 앞 두 글자만 (한 글자면 한 글자만), 별표는 3~6개 */
+    static String maskEmail(String email) {
+        int at = email.indexOf('@');
+        String local = email.substring(0, at);
+        int show = Math.min(2, Math.max(1, local.length() - 1));
+        return local.substring(0, show) + "*".repeat(Math.min(6, Math.max(3, local.length() - show))) + email.substring(at);
+    }
+    public static String normalize(String email){return email.trim().toLowerCase(Locale.ROOT);}
 }

@@ -54,6 +54,11 @@ public enum ErrorCode {
     CLAIM_IN_PROGRESS(HttpStatus.CONFLICT, "이미 처리 중인 신청이 있어요."),
     INVALID_CLAIM_STATUS(HttpStatus.CONFLICT, "지금 상태에서는 할 수 없어요."),
     POINT_NOT_ENOUGH(HttpStatus.CONFLICT, "적립금이 부족해요."),
+    OAUTH_NOT_ENABLED(HttpStatus.NOT_FOUND, "지금은 이 방법으로 로그인할 수 없어요."),
+    OAUTH_FAILED(HttpStatus.BAD_REQUEST, "로그인하지 못했어요. 다시 시도해 주세요."),
+    OAUTH_SIGNUP_EXPIRED(HttpStatus.BAD_REQUEST, "가입 시간이 지났어요. 처음부터 다시 로그인해 주세요."),
+    ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "배송지를 찾을 수 없어요."),
+    ADDRESS_LIMIT(HttpStatus.CONFLICT, "배송지는 10개까지 저장할 수 있어요. 안 쓰는 배송지를 지워 주세요."),
     ORDER_NOT_CONFIRMABLE(HttpStatus.CONFLICT, "배송 완료된 주문만 구매확정할 수 있어요."),
     MEMBER_HAS_ACTIVE_ORDERS(HttpStatus.CONFLICT, "진행 중인 주문이 있어요. 배송이 끝나거나 취소된 뒤에 탈퇴할 수 있어요."),
 

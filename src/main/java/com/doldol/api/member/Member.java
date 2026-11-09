@@ -39,6 +39,9 @@ public class Member extends BaseEntity{
     private boolean marketingAgreed;
     /** 마케팅 수신에 마지막으로 동의 / 철회한 시각 */
     private Instant marketingAgreedAt;
+    /** 비밀번호를 정했는가 (V17) — 소셜로만 가입하면 false (무작위 값). 이때는 변경 · 탈퇴에 현재 비밀번호를 묻지 않는다 */
+    @Column(nullable = false)
+    private boolean passwordSet;
     /** 탈퇴 시각 (V14) — 탈퇴하면 이메일 · 이름 · 휴대폰을 지우고 로그인할 수 없게 한다 */
     private Instant withdrawnAt;
     public static Member create(String email, String encodedPassword, String name, String phone, boolean marketingAgreed){
@@ -46,6 +49,7 @@ public class Member extends BaseEntity{
         Instant now = Instant.now();
         member.email = email;
         member.password = encodedPassword;
+        member.passwordSet = true;
         member.name = name;
         member.phone = phone;
         member.role = Role.USER;
@@ -55,9 +59,18 @@ public class Member extends BaseEntity{
         member.marketingAgreedAt = now;
         return member;
     }
+    /** 카카오 · 네이버로 가입 (V17) — 비밀번호는 무작위 값, 나중에 비밀번호 찾기 · 변경으로 정할 수 있다 */
+    public static Member createSocial(String email, String encodedRandomPassword, String name, String phone, boolean marketingAgreed){
+        Member member = create(email, encodedRandomPassword, name, phone, marketingAgreed);
+        member.passwordSet = false;
+        return member;
+    }
 //관리자 권한 변경
     public void changeRole(Role role){this.role = role;}
-    public void changePassword(String encodedPassword){this.password = encodedPassword;}
+    public void changePassword(String encodedPassword){
+        this.password = encodedPassword;
+        this.passwordSet = true;
+    }
     /** 탈퇴 — 주문 기록과의 연결만 남기고 개인정보를 지운다. 이메일은 유일해야 해서 id 로 채운다 */
     public void withdraw(String encodedRandomPassword){
         this.email = "withdrawn-" + id + "@doldol.invalid";
@@ -67,6 +80,11 @@ public class Member extends BaseEntity{
         this.marketingAgreed = false;
         this.marketingAgreedAt = Instant.now();
         this.withdrawnAt = Instant.now();
+    }
+    /** 회원정보 수정 — 이름 · 휴대폰 (휴대폰은 비우면 null) */
+    public void changeProfile(String name, String phone){
+        this.name = name;
+        this.phone = phone;
     }
     public void changeMarketingAgreed(boolean agreed){
         this.marketingAgreed = agreed;
